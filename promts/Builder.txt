@@ -1,0 +1,158 @@
+# Паттерн Builder — когда и как применять в проекте Rupor
+
+Builder используется у нас в двух местах:
+1. **Тестовые фабрики** — создание сущностей и DTO в тестах с выразительными дефолтами.
+2. **Композиция сложных запросов** — например, динамические SQL-фильтры или WS-сообщения (редко, по согласованию).
+
+## Когда Builder уместен
+
+- У сущности/структуры много полей, и в тестах большинство из них — шум.
+- Нужно создавать много вариаций одного объекта с небольшими отличиями.
+- Хочется читаемых тестов вида «пользователь как обычно, но заблокированный».
+
+## Когда Builder НЕ нужен
+
+- У структуры 1–3 поля. Проще передать их прямо в конструктор.
+- Сущность имеет строгий конструктор с инвариантами — в проде Builder не нужен, NewXxx достаточно.
+- Нужна одна-две фикстуры — обычные функции-хелперы проще.
+
+Builder — это инструмент для тестов и для редких случаев сложной композиции. В продовом коде предпочитаем явные конструкторы.
+
+## Правила Builder-а для тестов
+
+### 1. Живёт в тест-пакете
+
+Builder для `domain.User` живёт в `domain/testing_builders_test.go` (если используется только внутри domain-тестов) или в `internal/testfixtures/` (если переиспользуется между пакетами, по согласованию).
+
+Никаких test-builder-ов в продовом коде.
+
+### 2. Дефолты — валидные
+
+Builder по умолчанию создаёт полностью валидную сущность. Тест, которому «просто нужен какой-то пользователь», получает его одной строкой.
+
+```go
+user := NewUserBuilder(t).Build()
+```
+
+Дефолты детерминированы — фиксированное время, фиксированный uuid (либо uuid, который кэшируется в рамках теста, если это безопасно).
+
+### 3. Chainable методы
+
+Каждый setter возвращает `*Builder`, чтобы можно было цепочкой изменить нужные поля.
+
+```go
+user := NewUserBuilder(t).
+    WithEmail("banned@example.com").
+    Banned().
+    Build()
+```
+
+### 4. Build вызывает настоящий конструктор
+
+`Build()` не обходит инварианты домена. Внутри он вызывает реальный `domain.NewUser(...)` или `domain.ReconstructUser(...)` и падает через `t.Fatalf`, если конструктор вернул ошибку.
+
+```go
+func (b *UserBuilder) Build() *domain.User {
+    b.t.Helper()
+    u, err := domain.ReconstructUser(b.id, b.email, b.username, b.createdAt, b.status)
+    if err != nil {
+        b.t.Fatalf("UserBuilder.Build: %v", err)
+    }
+    return u
+}
+```
+
+Если тесту нужна намеренно невалидная сущность — это уже не builder, а прямой вызов внутреннего API (если это вообще оправдано).
+
+### 5. Принимает *testing.T
+
+Builder принимает `*testing.T` в конструкторе, чтобы `Build()` мог падать через `t.Fatalf` с `t.Helper()`. Не возвращать `(*User, error)` из `Build` — это шум в тестах.
+
+### 6. Семантические методы сверх сеттеров
+
+Наряду с `WithEmail`, `WithUsername` полезны семантические хелперы, выражающие состояние:
+
+```go
+func (b *UserBuilder) Banned() *UserBuilder { ... }
+func (b *UserBuilder) Admin() *UserBuilder { ... }
+func (b *UserBuilder) CreatedAt(t time.Time) *UserBuilder { ... }
+```
+
+Тест читается как предложение, а не как склад полей.
+
+### 7. Один Builder — одна сущность
+
+Не делать универсальный `EntityBuilder`, работающий с разными типами через generics и рефлексию. Для каждой сущности — свой builder в десяток строк. Это скучно и правильно.
+
+## Пример полного builder-а
+
+```go
+package domain_test
+
+import (
+    "testing"
+    "time"
+
+    "github.com/google/uuid"
+    "github.com/org/rupor/internal/auth/domain"
+)
+
+type UserBuilder struct {
+    t         *testing.T
+    id        domain.UserID
+    email     string
+    username  string
+    createdAt time.Time
+    status    domain.UserStatus
+}
+
+func NewUserBuilder(t *testing.T) *UserBuilder {
+    t.Helper()
+    return &UserBuilder{
+        t:         t,
+        id:        domain.NewUserID(uuid.New()),
+        email:     "user@example.com",
+        username:  "tester",
+        createdAt: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
+        status:    domain.UserStatusActive,
+    }
+}
+
+func (b *UserBuilder) WithEmail(email string) *UserBuilder       { b.email = email; return b }
+func (b *UserBuilder) WithUsername(username string) *UserBuilder { b.username = username; return b }
+func (b *UserBuilder) CreatedAt(t time.Time) *UserBuilder        { b.createdAt = t; return b }
+func (b *UserBuilder) Banned() *UserBuilder                      { b.status = domain.UserStatusBanned; return b }
+
+func (b *UserBuilder) Build() *domain.User {
+    b.t.Helper()
+    email, err := domain.NewEmail(b.email)
+    if err != nil {
+        b.t.Fatalf("UserBuilder: email: %v", err)
+    }
+    username, err := domain.NewUsername(b.username)
+    if err != nil {
+        b.t.Fatalf("UserBuilder: username: %v", err)
+    }
+    u, err := domain.ReconstructUser(b.id, email, username, b.createdAt, b.status)
+    if err != nil {
+        b.t.Fatalf("UserBuilder.Build: %v", err)
+    }
+    return u
+}
+```
+
+## Builder в продовом коде
+
+Почти никогда. Исключения, требующие согласования:
+- Сборка SQL-фильтров в репозитории, где список фильтров варьируется. Даже там чаще проще `type Filter struct { ... }` и проверка на zero-value.
+- Сборка WebSocket-сообщений с условными полями — см. выше, обычно достаточно структуры.
+
+Если в PR появляется Builder в проде — остановиться и обсудить с пользователем.
+
+## Красные флаги
+
+- Builder в продовом коде без явной причины → удалить, заменить конструктором.
+- Builder строит сущность в обход инвариантов → исправить, вызывать реальный `NewXxx`.
+- Build() возвращает ошибку → принимать `*testing.T` и падать через `t.Fatalf`.
+- Universal generic builder → переписать на явный.
+- Build() меняет внутреннее состояние builder-а так, что повторный вызов даёт другой результат → сделать иммутабельным или явно задокументировать.

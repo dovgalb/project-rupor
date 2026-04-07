@@ -6,9 +6,13 @@
 
 ```
 project-rupor/
-├── cmd/server/          # Точка входа, запуск HTTP-сервера
+├── cmd/server/          # Точка входа, composition root
 ├── internal/
 │   ├── auth/            # Регистрация, логин, JWT (access + refresh)
+│   │   ├── domain/              # Сущности, value objects, доменные ошибки
+│   │   ├── usecase/             # Сценарии + интерфейсы зависимостей
+│   │   ├── transport/http/      # HTTP-хендлеры, DTO запросов/ответов
+│   │   └── repository/postgres/ # Реализация репозиториев через sqlc
 │   ├── user/            # Профили пользователей
 │   ├── room/            # Комнаты (аналог серверов Discord), роли, инвайты
 │   ├── channel/         # Каналы внутри комнат (text / voice)
@@ -19,16 +23,17 @@ project-rupor/
 ├── migrations/          # SQL-миграции (golang-migrate)
 ├── config/              # Загрузка конфигурации из env-переменных
 ├── web/                 # React + Vite фронтенд
+├── promts/              # Промпты для агентов (архитектура и т.п.)
 ├── docker-compose.yml   # PostgreSQL + Redis + сервер
 ├── Makefile             # run, test, migrate, lint, build
 └── go.mod
 ```
 
-Каждый домен в `internal/` имеет слои: `handler.go` (HTTP), `service.go` (логика), `repository.go` (БД).
+Каждый домен в `internal/` следует Clean Architecture и делится на подпапки `domain/`, `usecase/`, `transport/`, `repository/`. Структура одинакова для всех доменов. Подробные правила слоёв и направления зависимостей — в `promts/Architecture Layers.txt`.
 
 ## Стек
 
-- **Go 1.22+** — `chi` (роутинг), `sqlc` (генерация кода из SQL), `golang-migrate` (миграции)
+- **Go 1.25+** — `chi` (роутинг), `sqlc` (генерация кода из SQL), `golang-migrate` (миграции)
 - **PostgreSQL** — единственная БД, хранит всё: пользователей, комнаты, каналы, сообщения
 - **WebSocket** — `nhooyr.io/websocket`, реалтайм чат и сигнализация голоса
 - **WebRTC** — P2P аудио через браузерный API, сервер только сигнализирует
@@ -67,3 +72,7 @@ make dc-up       # Docker Compose up
 - Все функции должны быть тестируемыми, предпочитать чистые функции
 - SQL через `sqlc`, не использовать ORM
 - Конфигурация только через env, не через файлы
+
+## Правила разработки с ai
+1. `research_codebase + промт`(в .thoughts создается файл с результатами ресерча)
+2. `design_feature + название тикета + .thoughts/название ресерча`

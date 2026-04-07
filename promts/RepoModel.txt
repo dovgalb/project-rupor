@@ -1,0 +1,175 @@
+# Repo Model — маппинг между доменом и хранилищем
+
+Этот документ описывает, как мы строим модели хранения и маппинг между `domain.*` и структурами, возвращаемыми sqlc. Короткое правило: **домен не знает про БД, репозиторий — мост**.
+
+## Базовый принцип
+
+- `domain/` содержит чистые сущности (см. `Domain Model.txt`).
+- `repository/postgres/` содержит:
+  - sqlc-сгенерированные структуры и запросы (в поддиректории `db/` или `sqlc/`).
+  - Репозиторий — реализацию интерфейса из `usecase/`.
+  - Модели хранения (repo model) — если нужны (см. ниже).
+  - Мапперы `domainToRow` / `rowToDomain`.
+
+## Три типа структур, которые могут встретиться
+
+1. **Доменная сущность** (`domain.User`) — богатая, с инвариантами, приватными полями, методами. Живёт в `domain/`.
+2. **Sqlc row-структура** (`db.User` или `db.GetUserByIDRow`) — генерируется sqlc, представляет строку таблицы или результат запроса. Живёт в `repository/postgres/db/`.
+3. **Repo model** (`userRow` или `userRecord`) — промежуточная структура, которую пишем мы, если sqlc-структуры мало или нужно собрать данные из нескольких запросов. Опциональна.
+
+## Когда repo model не нужна
+
+Если sqlc-структура один к одному соответствует тому, что нужно в домене — мапим напрямую:
+
+```go
+func (r *UserRepository) FindByID(ctx context.Context, id domain.UserID) (*domain.User, error) {
+    row, err := r.q.GetUserByID(ctx, id.UUID())
+    if err != nil {
+        if errors.Is(err, sql.ErrNoRows) {
+            return nil, domain.ErrUserNotFound
+        }
+        return nil, fmt.Errorf("get user by id: %w", err)
+    }
+    return rowToDomainUser(row)
+}
+```
+
+## Когда repo model нужна
+
+- Данные собираются из нескольких запросов (основная сущность + связанные).
+- Нужно трансформировать форму до того, как звать доменный конструктор.
+- sqlc возвращает анонимные row-структуры с неудобными именами для разных запросов — унифицируем через свою structure.
+
+В таких случаях:
+
+```go
+type userRow struct {
+    id        uuid.UUID
+    email     string
+    username  string
+    createdAt time.Time
+    status    string
+}
+
+func (r userRow) toDomain() (*domain.User, error) {
+    email, err := domain.NewEmail(r.email)
+    if err != nil {
+        return nil, fmt.Errorf("user row: email: %w", err)
+    }
+    username, err := domain.NewUsername(r.username)
+    if err != nil {
+        return nil, fmt.Errorf("user row: username: %w", err)
+    }
+    status, err := domain.ParseUserStatus(r.status)
+    if err != nil {
+        return nil, fmt.Errorf("user row: status: %w", err)
+    }
+    return domain.ReconstructUser(
+        domain.NewUserID(r.id),
+        email,
+        username,
+        r.createdAt,
+        status,
+    )
+}
+```
+
+## Правила маппинга
+
+### 1. Маппинг идёт через доменные конструкторы
+
+Никогда не заполнять поля домена через рефлексию или неэкспортируемые сеттеры. Всегда вызывать `domain.ReconstructXxx(...)` — это вариант конструктора, предназначенный для восстановления из хранилища. Он проверяет инварианты.
+
+### 2. Два направления — две функции
+
+- `domainToRow(u *domain.User) userRow` — для записи в БД.
+- `rowToDomain(r userRow) (*domain.User, error)` — для чтения.
+
+Оба маппера живут рядом с репозиторием, не в `domain/`.
+
+### 3. Value objects разворачиваются на границе
+
+`domain.Email` → `string` при записи, `string` → `domain.Email` при чтении. Репозиторий знает про value objects, потому что он находится в адаптере, но БД про них не знает.
+
+### 4. Ошибки маппинга — это баг данных
+
+Если `rowToDomain` вернул ошибку — это значит, что в БД лежат данные, нарушающие инвариант домена. Это критично. Репозиторий оборачивает такую ошибку и возвращает её — пусть use case и транспорт обработают и залогируют.
+
+### 5. Маппер не делает I/O
+
+Маппер — чистая функция от структуры к структуре (плюс возможная ошибка валидации). Никаких запросов в БД внутри маппера. Если для полной сборки сущности нужен ещё один запрос — этот запрос делает репозиторий, а маппер принимает уже все данные.
+
+### 6. Nullable-поля
+
+sqlc возвращает nullable-поля как `sql.NullString`, `pgtype.Timestamptz` и т.п. Маппер разворачивает их и либо передаёт в домен значение, либо доменную ошибку, если поле по инварианту не может быть пустым.
+
+```go
+if !row.DeactivatedAt.Valid {
+    // поле опционально — передаём zero time
+    deactivatedAt = time.Time{}
+} else {
+    deactivatedAt = row.DeactivatedAt.Time
+}
+```
+
+### 7. Enum-ы
+
+БД-enum хранится как string (или int). В домене — типизированный `UserStatus`. Маппер вызывает `domain.ParseUserStatus(raw)`, который возвращает ошибку на неизвестное значение.
+
+### 8. Id-ы
+
+В домене — value object `UserID`, в БД — `uuid.UUID`. Маппер делает `domain.NewUserID(row.ID)` и `user.ID().UUID()` при обратном направлении.
+
+## Структура репозитория
+
+```go
+type UserRepository struct {
+    q *db.Queries // sqlc-сгенерированные методы
+}
+
+func NewUserRepository(q *db.Queries) *UserRepository {
+    return &UserRepository{q: q}
+}
+
+func (r *UserRepository) Save(ctx context.Context, u *domain.User) error {
+    params := domainToInsertUserParams(u)
+    if err := r.q.InsertUser(ctx, params); err != nil {
+        // маппим конкретные ошибки БД в доменные
+        if isUniqueViolation(err, "users_email_key") {
+            return domain.ErrEmailAlreadyTaken
+        }
+        return fmt.Errorf("insert user: %w", err)
+    }
+    return nil
+}
+```
+
+## Транзакции
+
+- Транзакцию открывает use case через отдельный интерфейс `UnitOfWork` или через `BeginTx` на самом репозитории — решается при проектировании.
+- Маппер и SQL-методы не знают про транзакции: им передаётся `db.Queries`, который может быть построен либо на пуле, либо на `tx`. sqlc поддерживает этот паттерн через `WithTx`.
+
+## Ошибки БД → доменные ошибки
+
+Мапим в репозитории:
+- `sql.ErrNoRows` → `domain.ErrXxxNotFound`.
+- Unique violation по известному constraint → соответствующая доменная ошибка.
+- Всё остальное — оборачиваем через `fmt.Errorf("..: %w", err)` и возвращаем. Use case решит, что делать.
+
+Определение типа ошибки БД — через проверку `*pgconn.PgError` (если используем pgx). Utility-функции `isUniqueViolation`, `isForeignKeyViolation` лежат рядом с репозиторием.
+
+## Что НЕ делать
+
+- Не тащить sqlc-структуры в `usecase/` или `domain/`.
+- Не возвращать из репозитория `db.User` наружу — только `*domain.User`.
+- Не делать двойных структур ради «красоты», если sqlc-row и так подходит.
+- Не класть JSON-теги, валидацию или HTTP-коды в repo model.
+- Не смешивать чтение из двух несвязанных сущностей в одном SQL-запросе ради экономии — лучше два запроса и явный маппинг, чем мутные join-ы.
+- Не заводить `BaseModel` с общими полями — в Go это антипаттерн.
+
+## Красные флаги
+
+- Маппер вызывает другой репозиторий → вынести оркестрацию в use case.
+- `rowToDomain` обходит конструктор домена через `&domain.User{...}` с публичными полями → значит, домен анемичный или поля публичные, чинить домен.
+- Репозиторий возвращает sqlc-структуру наружу → нарушение слоёв.
+- Одна и та же маппинг-логика копируется в трёх местах → вынести в одну функцию рядом с репозиторием.
