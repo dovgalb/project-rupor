@@ -23,13 +23,13 @@ project-rupor/
 ├── migrations/          # SQL-миграции (golang-migrate)
 ├── config/              # Загрузка конфигурации из env-переменных
 ├── web/                 # React + Vite фронтенд
-├── promts/              # Промпты для агентов (архитектура и т.п.)
+├── prompts/             # Промпты для агентов (архитектура и т.п.)
 ├── docker-compose.yml   # PostgreSQL + Redis + сервер
 ├── Makefile             # run, test, migrate, lint, build
 └── go.mod
 ```
 
-Каждый домен в `internal/` следует Clean Architecture и делится на подпапки `domain/`, `usecase/`, `transport/`, `repository/`. Структура одинакова для всех доменов. Подробные правила слоёв и направления зависимостей — в `promts/Architecture Layers.txt`.
+Каждый домен в `internal/` следует Clean Architecture и делится на подпапки `domain/`, `usecase/`, `transport/`, `repository/`. Структура одинакова для всех доменов. Подробные правила слоёв и направления зависимостей — в `prompts/Architecture Layers.txt`.
 
 ## Стек
 
