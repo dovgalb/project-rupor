@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-test-lint:
+    name: Build, Test, Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+          cache: true
+
+      - name: go mod download
+        run: go mod download
+
+      - name: go build
+        run: go build ./...
+
+      - name: go test
+        run: go test ./... -race -count=1
+
+      - uses: golangci/golangci-lint-action@v6
+        with:
+          version: v1.62
+          args: --timeout=3m

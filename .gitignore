@@ -1,0 +1,29 @@
+# Build artifacts
+/bin/
+/dist/
+/coverage.out
+/coverage.html
+*.test
+*.out
+
+# Go
+/vendor/
+
+# Env
+/.env
+/.env.local
+!/.env.example
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE — оставляем .idea/.gitignore tracked
+/.idea/*
+!/.idea/.gitignore
+
+# Logs
+*.log
+
+# tmp
+/tmp/
