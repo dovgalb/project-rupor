@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# Pre-commit hook: проверка staged Go-файлов перед коммитом.
+# Активация: make install-hooks (один раз на машину).
+
+set -euo pipefail
+
+# Собираем staged Go-файлы (Added/Copied/Modified/Renamed).
+STAGED_GO=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '\.go$' || true)
+
+if [ -z "$STAGED_GO" ]; then
+    exit 0
+fi
+
+COUNT=$(echo "$STAGED_GO" | wc -l | tr -d ' ')
+echo "pre-commit: проверка $COUNT Go-файлов"
+
+# 1. gofmt — проверяем форматирование.
+UNFORMATTED=$(echo "$STAGED_GO" | xargs gofmt -l)
+if [ -n "$UNFORMATTED" ]; then
+    echo "Файлы не отформатированы (запусти 'make fmt'):"
+    echo "$UNFORMATTED"
+    exit 1
+fi
+
+# 2. golangci-lint — линт по всему проекту (учитывает межпакетные связи).
+if ! command -v golangci-lint >/dev/null 2>&1; then
+    echo "golangci-lint не установлен. См. https://golangci-lint.run/welcome/install/"
+    exit 1
+fi
+golangci-lint run
+
+# 3. go build — проверяем, что компилируется.
+go build ./...
+
+echo "pre-commit: OK"

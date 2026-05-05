@@ -1,23 +1,28 @@
+version: "2"
+
 run:
   timeout: 3m
   go: "1.25"
 
 linters:
-  disable-all: true
+  default: none
   enable:
     - govet
     - staticcheck
     - errcheck
     - ineffassign
     - unused
+  settings:
+    govet:
+      enable-all: true
+      disable:
+        - fieldalignment
+
+formatters:
+  enable:
     - gofmt
     - goimports
-
-linters-settings:
-  goimports:
-    local-prefixes: github.com/dovgalb/project-rupor
-  govet:
-    enable-all: true
-
-issues:
-  exclude-use-default: false
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/dovgalb/project-rupor
