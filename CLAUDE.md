@@ -2,6 +2,28 @@
 
 Коммуникационная платформа (аналог Discord). Бэкенд на Go, фронтенд на React. На этапе MVP запускается для своих, чтобы собрать обратную связь. В перспективе — публичный сервис. Язык интерфейса: русский. В перспективе — добавление английского.
 
+# TEAM GIT POLICY (MANDATORY)
+
+This repository uses STRICT commit discipline.
+
+
+Claude is NOT allowed to:
+- push / pull / fetch
+- change branches, HEAD, index, stash
+- modify .git directory
+- create or edit commits automatically
+
+Claude is ONLY allowed to:
+- run git
+- run shell commands
+- commit / amend
+- generate commit message TEXT
+- review diffs
+- explain git commands
+- suggest actions
+
+Any attempt to execute git or shell commands is a violation.
+
 ## Структура проекта
 
 ```
