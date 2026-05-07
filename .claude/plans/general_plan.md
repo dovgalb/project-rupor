@@ -24,46 +24,6 @@ Message
  └── (в MVP без редактирования/удаления — добавим позже)
 ```
 
-## Фазы MVP
-
-### Фаза 1 — Фундамент + Авторизация
-
-- Структура проекта, Docker Compose (PostgreSQL), миграции
-- Регистрация, логин, JWT (access + refresh)
-- Middleware авторизации
-- Результат: рабочий API с авторизацией, можно тестить через curl
-
-### Фаза 2 — Комнаты и каналы
-
-- CRUD комнат (создание, получение, удаление)
-- CRUD каналов внутри комнат
-- Роли и права (owner создаёт, admin управляет каналами, member читает)
-- Инвайт-ссылки (генерация + вступление по коду)
-- Список участников комнаты
-
-### Фаза 3 — Текстовый чат (реалтайм)
-
-- WebSocket подключение с авторизацией по JWT
-- Hub: подписка на каналы, рассылка сообщений подписчикам
-- Сохранение сообщений в БД
-- REST-эндпоинт для истории сообщений с пагинацией
-- Результат: полноценный чат, можно общаться в реалтайме
-
-### Фаза 4 — Голосовые звонки
-
-- Сигнальный сервер поверх WebSocket (обмен SDP/ICE)
-- WebRTC P2P для аудио
-- STUN-сервер (публичный Google STUN на старте)
-- Управление состоянием: кто в голосовом канале, mute/unmute
-- Результат: можно созваниваться в голосовых каналах
-
-### Фаза 5 — Веб-клиент (React)
-
-- Авторизация (формы логина/регистрации)
-- Список комнат и каналов (сайдбар)
-- Текстовый чат (WebSocket)
-- Голосовой интерфейс (кнопки подключения/мута, WebRTC)
-
 ## Стек
 
 | Компонент | Технология |
@@ -117,3 +77,108 @@ WS     /api/v1/ws?token=<jwt>
 ← клиент: { "type": "member.joined", "data": { ... } }
 ← клиент: { "type": "voice.signal", "data": { sdp/ice } }
 ```
+
+---
+
+# Декомпозиция задач
+
+Отметки: `[x]` — сделано, `[~]` — частично, `[ ]` — не начато.
+
+## Фаза 1 — Фундамент + Авторизация
+
+### 1.1 Инфраструктура проекта
+- [x] Структура папок по Clean Architecture (`internal/{auth,user,room,channel,chat,voice}`)
+- [x] `go.mod`, базовые зависимости (`chi`)
+- [x] `Makefile` (run/test/lint/build/migrate/dc-up)
+- [x] `docker-compose.yml` (PostgreSQL + Redis)
+- [x] `.env.example`, загрузка конфига из env (`config/config.go` + тесты)
+- [x] `.golangci.yml` v2, pre-commit хук, CI (`.github/workflows/ci.yml`)
+- [x] `cmd/server/main.go` + health endpoint + тест
+- [x] Каркас миграций (`golang-migrate`), `sqlc.yaml`
+
+### 1.2 Схема БД
+- [x] Подключён `pgcrypto` (миграция `0001_init`)
+- [ ] Миграция: таблица `users` (id, email, password_hash, username, created_at)
+- [ ] Миграция: таблица `refresh_tokens` (если хранятся в БД)
+- [ ] Индексы на email/username
+
+### 1.3 Домен auth
+- [ ] `internal/auth/domain/`: сущности `User`, value objects (`Email`, `Password`), доменные ошибки
+- [ ] `internal/auth/usecase/`: интерфейсы репозиториев + сценарии Register / Login / Refresh
+- [ ] Хеширование паролей (bcrypt)
+- [ ] Генерация и валидация JWT (access + refresh)
+- [ ] `internal/auth/repository/postgres/`: sqlc-запросы и реализация репозитория
+- [ ] `internal/auth/transport/http/`: хендлеры `POST /auth/register`, `/auth/login`, `/auth/refresh`, `GET /auth/me` + DTO
+- [ ] Подключение роутов в `cmd/server/main.go`
+
+### 1.4 Middleware
+- [ ] JWT-middleware (извлечение `Authorization: Bearer`, валидация, проброс userID в контекст)
+- [ ] Логирование запросов
+- [ ] Recover middleware
+- [ ] CORS (для будущего фронта)
+
+### 1.5 Тесты
+- [ ] Unit-тесты usecase auth (с моками репо)
+- [ ] Интеграционные тесты HTTP-хендлеров auth
+- [ ] e2e через curl/http-файл
+
+---
+
+## Фаза 2 — Комнаты и каналы
+- [ ] Миграции: `rooms`, `room_members` (с ролями owner/admin/member), `invites`, `channels` (тип text/voice)
+- [ ] Домен `room`: сущности, роли, инварианты прав
+- [ ] Usecase: создать/получить/удалить комнату, список комнат пользователя
+- [ ] Usecase: генерация инвайта, вступление по коду
+- [ ] Usecase: список участников
+- [ ] Домен `channel`: CRUD каналов внутри комнаты, проверка прав
+- [ ] HTTP: `POST/GET/DELETE /rooms`, `/rooms/:id/invite`, `/rooms/join/:code`, `/rooms/:id/members`
+- [ ] HTTP: `POST/GET/DELETE /rooms/:id/channels`
+- [ ] Репозитории postgres (sqlc) для room/channel
+- [ ] Тесты
+
+---
+
+## Фаза 3 — Текстовый чат (реалтайм)
+- [ ] Миграция: `messages` (id, channel_id, author_id, text, created_at) + индексы
+- [ ] `pkg/websocket/`: hub, регистрация подключений, подписка на каналы, broadcast
+- [ ] WebSocket-эндпоинт `/api/v1/ws?token=<jwt>` с авторизацией по JWT
+- [ ] Обработчики событий: `subscribe`, `message.send`, `message.new`, `member.joined`
+- [ ] Домен `chat`: сущности, usecase отправки/чтения сообщений
+- [ ] Сохранение сообщений в БД (sqlc)
+- [ ] REST `GET /channels/:id/messages?before=&limit=` (курсорная пагинация)
+- [ ] Проверка прав (только член комнаты может писать/читать)
+- [ ] Тесты hub'а и usecase
+
+---
+
+## Фаза 4 — Голосовые звонки
+- [ ] Расширение WS-протокола: `voice.signal` (SDP/ICE)
+- [ ] Сигнальный сервер в `internal/voice/`: маршрутизация SDP/ICE между пирами в одном voice-канале
+- [ ] Состояние voice-канала: список участников, mute/unmute
+- [ ] События: `voice.user-joined`, `voice.user-left`, `voice.mute-changed`
+- [ ] Конфиг STUN (Google публичный)
+- [ ] Тесты сигнализации
+
+---
+
+## Фаза 5 — Веб-клиент (React)
+- [ ] `web/` — Vite + React + Zustand скелет
+- [ ] Формы регистрации/логина, хранение токенов, refresh-флоу
+- [ ] Сайдбар: список комнат и каналов
+- [ ] Чат: WS-клиент, отображение истории, отправка сообщений
+- [ ] Голос: подключение/мут, WebRTC P2P, отображение участников
+- [ ] Сборка через Docker
+
+---
+
+## Сводка прогресса
+
+| Фаза | Готовность |
+|------|------------|
+| 1. Фундамент + Авторизация | ~20% (только инфраструктура и health) |
+| 2. Комнаты и каналы | 0% |
+| 3. Текстовый чат | 0% |
+| 4. Голос | 0% |
+| 5. Фронтенд | 0% |
+
+Следующий шаг — **1.2 + 1.3**: миграция `users`, домен `auth`, регистрация/логин/JWT.
