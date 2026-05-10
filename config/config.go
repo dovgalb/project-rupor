@@ -3,15 +3,18 @@ package config
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
 const (
-	defaultServerPort    = 8080
-	defaultJWTAccessTTL  = 15 * time.Minute
-	defaultJWTRefreshTTL = 720 * time.Hour
+	defaultServerPort        = 8080
+	defaultJWTAccessTTL      = 15 * time.Minute
+	defaultJWTRefreshTTL     = 720 * time.Hour
+	defaultCORSAllowedOrigin = "http://localhost:5173"
 
 	maxJWTAccessTTL  = time.Hour
 	maxJWTRefreshTTL = 90 * 24 * time.Hour
@@ -34,11 +37,12 @@ func (e ValidationError) Is(target error) bool {
 }
 
 type Config struct {
-	serverPort    int
-	databaseURL   string
-	jwtSecret     string
-	jwtAccessTTL  time.Duration
-	jwtRefreshTTL time.Duration
+	serverPort         int
+	databaseURL        string
+	jwtSecret          string
+	jwtAccessTTL       time.Duration
+	jwtRefreshTTL      time.Duration
+	corsAllowedOrigins []string
 }
 
 func (c *Config) ServerPort() int              { return c.serverPort }
@@ -46,6 +50,13 @@ func (c *Config) DatabaseURL() string          { return c.databaseURL }
 func (c *Config) JWTSecret() string            { return c.jwtSecret }
 func (c *Config) JWTAccessTTL() time.Duration  { return c.jwtAccessTTL }
 func (c *Config) JWTRefreshTTL() time.Duration { return c.jwtRefreshTTL }
+
+// CORSAllowedOrigins возвращает копию whitelisted origins.
+func (c *Config) CORSAllowedOrigins() []string {
+	cp := make([]string, len(c.corsAllowedOrigins))
+	copy(cp, c.corsAllowedOrigins)
+	return cp
+}
 
 type Lookuper interface {
 	Lookup(key string) (string, bool)
@@ -91,12 +102,18 @@ func Load(l Lookuper) (*Config, error) {
 		return nil, err
 	}
 
+	corsOrigins, err := loadCORSAllowedOrigins(l)
+	if err != nil {
+		return nil, err
+	}
+
 	return &Config{
-		serverPort:    port,
-		databaseURL:   dbURL,
-		jwtSecret:     jwt,
-		jwtAccessTTL:  accessTTL,
-		jwtRefreshTTL: refreshTTL,
+		serverPort:         port,
+		databaseURL:        dbURL,
+		jwtSecret:          jwt,
+		jwtAccessTTL:       accessTTL,
+		jwtRefreshTTL:      refreshTTL,
+		corsAllowedOrigins: corsOrigins,
 	}, nil
 }
 
@@ -207,4 +224,58 @@ func loadRefreshTTL(l Lookuper, accessTTL time.Duration) (time.Duration, error) 
 	}
 
 	return d, nil
+}
+
+func loadCORSAllowedOrigins(l Lookuper) ([]string, error) {
+	raw, ok := l.Lookup("CORS_ALLOWED_ORIGINS")
+	if !ok || strings.TrimSpace(raw) == "" {
+		return []string{defaultCORSAllowedOrigin}, nil
+	}
+
+	parts := strings.Split(raw, ",")
+	origins := make([]string, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		if err := validateOrigin(p); err != nil {
+			return nil, ValidationError{
+				Code:   "CONFIG-006",
+				Field:  "CORS_ALLOWED_ORIGINS",
+				Reason: fmt.Sprintf("invalid origin %q: %s", p, err.Error()),
+			}
+		}
+		origins = append(origins, p)
+	}
+
+	if len(origins) == 0 {
+		return nil, ValidationError{
+			Code:   "CONFIG-006",
+			Field:  "CORS_ALLOWED_ORIGINS",
+			Reason: "must contain at least one origin",
+		}
+	}
+
+	return origins, nil
+}
+
+func validateOrigin(s string) error {
+	u, err := url.Parse(s)
+	if err != nil {
+		return err
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return fmt.Errorf("scheme must be http or https, got %q", u.Scheme)
+	}
+	if u.Host == "" {
+		return fmt.Errorf("host is empty")
+	}
+	if u.Path != "" && u.Path != "/" {
+		return fmt.Errorf("must not contain path, got %q", u.Path)
+	}
+	if u.RawQuery != "" || u.Fragment != "" {
+		return fmt.Errorf("must not contain query or fragment")
+	}
+	return nil
 }

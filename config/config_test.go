@@ -2,6 +2,7 @@ package config_test
 
 import (
 	"errors"
+	"reflect"
 	"testing"
 	"time"
 
@@ -243,6 +244,108 @@ func TestConfig_Load_PortOutOfRange(t *testing.T) {
 			}
 			if verr.Code != "CONFIG-003" {
 				t.Fatalf("port %q: Code = %q, want CONFIG-003", tc.port, verr.Code)
+			}
+		})
+	}
+}
+
+func TestConfig_Load_DefaultCORS(t *testing.T) {
+	t.Parallel()
+
+	cfg, err := config.Load(validEnv())
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	got := cfg.CORSAllowedOrigins()
+	want := []string{"http://localhost:5173"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("CORSAllowedOrigins() = %v, want %v", got, want)
+	}
+}
+
+func TestConfig_Load_CSVOrigins(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		env  string
+		want []string
+	}{
+		{"single", "http://a.com", []string{"http://a.com"}},
+		{"two", "http://a.com,https://b.com:8080", []string{"http://a.com", "https://b.com:8080"}},
+		{"with_spaces", "http://a.com , https://b.com", []string{"http://a.com", "https://b.com"}},
+		{"trailing_comma", "http://a.com,", []string{"http://a.com"}},
+	}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			env := validEnv()
+			env["CORS_ALLOWED_ORIGINS"] = tc.env
+			cfg, err := config.Load(env)
+			if err != nil {
+				t.Fatalf("Load: %v", err)
+			}
+			got := cfg.CORSAllowedOrigins()
+			if !reflect.DeepEqual(got, tc.want) {
+				t.Fatalf("got %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestConfig_Load_EmptyCORS(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct{ name, env string }{
+		{"only_comma", ","},
+		{"only_commas_and_spaces", " , , "},
+	}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			env := validEnv()
+			env["CORS_ALLOWED_ORIGINS"] = tc.env
+			_, err := config.Load(env)
+			var verr config.ValidationError
+			if !errors.As(err, &verr) {
+				t.Fatalf("err = %v, want ValidationError", err)
+			}
+			if verr.Code != "CONFIG-006" {
+				t.Fatalf("Code = %q, want CONFIG-006", verr.Code)
+			}
+			if verr.Field != "CORS_ALLOWED_ORIGINS" {
+				t.Fatalf("Field = %q", verr.Field)
+			}
+		})
+	}
+}
+
+func TestConfig_Load_InvalidOrigin(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct{ name, value string }{
+		{"no_scheme", "localhost:5173"},
+		{"with_path", "http://x.com/path"},
+		{"with_query", "http://x.com?foo=bar"},
+		{"ftp_scheme", "ftp://x.com"},
+		{"empty_host", "http://"},
+		{"mixed_valid_invalid", "http://x.com,not-a-url"},
+	}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			env := validEnv()
+			env["CORS_ALLOWED_ORIGINS"] = tc.value
+			_, err := config.Load(env)
+			var verr config.ValidationError
+			if !errors.As(err, &verr) {
+				t.Fatalf("err = %v, want ValidationError", err)
+			}
+			if verr.Code != "CONFIG-006" {
+				t.Fatalf("Code = %q, want CONFIG-006", verr.Code)
 			}
 		})
 	}

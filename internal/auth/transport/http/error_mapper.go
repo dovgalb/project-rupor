@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/dovgalb/project-rupor/internal/auth/domain"
+	"github.com/dovgalb/project-rupor/pkg/httpx"
 )
 
 type httpError struct {
@@ -45,11 +46,9 @@ func mapError(err error) httpError {
 }
 
 func writeError(w http.ResponseWriter, he httpError) {
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(he.status)
-	_ = jsonEncode(w, errorEnvelope{Error: errorBody{Code: he.code, Message: he.message}})
+	httpx.WriteJSONError(w, he.status, he.code, he.message)
 }
 
 func writeBadBody(w http.ResponseWriter) {
-	writeError(w, httpError{http.StatusBadRequest, "AUTH-012", "malformed request body"})
+	httpx.WriteJSONError(w, http.StatusBadRequest, "AUTH-012", "malformed request body")
 }

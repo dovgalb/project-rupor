@@ -3,6 +3,7 @@ package httpauth
 import (
 	"github.com/go-chi/chi/v5"
 
+	authmw "github.com/dovgalb/project-rupor/internal/auth/transport/http/middleware"
 	"github.com/dovgalb/project-rupor/internal/auth/usecase"
 )
 
@@ -17,9 +18,14 @@ type Deps struct {
 
 func RegisterRoutes(r chi.Router, deps Deps) {
 	r.Route("/auth", func(r chi.Router) {
-		r.Post("/register", NewRegisterHandler(deps.Register).ServeHTTP)
-		r.Post("/login", NewLoginHandler(deps.Login).ServeHTTP)
-		r.Post("/refresh", NewRefreshHandler(deps.Refresh).ServeHTTP)
-		r.Get("/me", NewMeHandler(deps.Me, deps.TokenIssuer, deps.Clock).ServeHTTP)
+		r.Group(func(r chi.Router) {
+			r.Post("/register", NewRegisterHandler(deps.Register).ServeHTTP)
+			r.Post("/login", NewLoginHandler(deps.Login).ServeHTTP)
+			r.Post("/refresh", NewRefreshHandler(deps.Refresh).ServeHTTP)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(authmw.RequireAuth(deps.TokenIssuer, deps.Clock))
+			r.Get("/me", NewMeHandler(deps.Me).ServeHTTP)
+		})
 	})
 }

@@ -1,0 +1,40 @@
+@host = http://localhost:8080
+
+### Без X-Request-ID — middleware генерирует UUID
+GET {{host}}/api/v1/health
+
+# Проверить:
+# - X-Request-ID присутствует
+# - Формат — UUID v4 (8-4-4-4-12 hex с дефисами)
+# - В логах сервера request_id == значению из header
+
+### С валидным клиентским
+GET {{host}}/api/v1/health
+X-Request-ID: my-correlation-1
+
+# Проверить:
+# - X-Request-ID == "my-correlation-1" (как передали)
+# - В логах request_id == "my-correlation-1"
+
+### С CRLF (попытка инъекции в логи)
+GET {{host}}/api/v1/health
+X-Request-ID: bad\r\nX-Hack: 1
+
+# Проверить:
+# - X-Request-ID — сгенерированный UUID (НЕ переданное значение)
+# - В response НЕТ заголовка X-Hack
+# - В логах request_id — сгенерированный UUID
+
+### С non-ASCII
+GET {{host}}/api/v1/health
+X-Request-ID: τεστ
+
+# Проверить:
+# - X-Request-ID — сгенерированный UUID
+
+### С >128 символов
+GET {{host}}/api/v1/health
+X-Request-ID: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+
+# Проверить:
+# - X-Request-ID — сгенерированный UUID

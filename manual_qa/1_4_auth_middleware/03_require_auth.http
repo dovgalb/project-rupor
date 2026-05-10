@@ -1,0 +1,48 @@
+@host = http://localhost:8080
+@access_token = <получи из manual_qa/1_3_auth/02_login.http>
+
+### Без Authorization
+GET {{host}}/api/v1/auth/me
+
+# Проверить:
+# - Status 401
+# - Body: {"error":{"code":"AUTH-010","message":"access token invalid"}}
+# - X-Request-ID присутствует
+
+### Authorization не Bearer
+GET {{host}}/api/v1/auth/me
+Authorization: Basic dGVzdDp0ZXN0
+
+# Проверить:
+# - Status 401 + AUTH-010
+
+### Bearer пустой
+GET {{host}}/api/v1/auth/me
+Authorization: Bearer
+
+# Проверить:
+# - Status 401 + AUTH-010
+
+### lowercase bearer (case-sensitive)
+GET {{host}}/api/v1/auth/me
+Authorization: bearer {{access_token}}
+
+# Проверить:
+# - Status 401 + AUTH-010 (даже если access_token валиден)
+
+### Невалидная подпись
+GET {{host}}/api/v1/auth/me
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.invalid_payload.fake_signature
+
+# Проверить:
+# - Status 401 + AUTH-010
+
+### Happy path
+GET {{host}}/api/v1/auth/me
+Authorization: Bearer {{access_token}}
+
+# Проверить:
+# - Status 200
+# - Body: {"id":"<uuid>","email":"...","username":"...","createdAt":"..."}
+# - X-Request-ID присутствует
+# - В логах сервера user_id="<uid>" (через userIDHook)

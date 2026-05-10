@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/dovgalb/project-rupor/config"
@@ -22,7 +23,9 @@ import (
 	"github.com/dovgalb/project-rupor/internal/auth/repository/postgres"
 	"github.com/dovgalb/project-rupor/internal/auth/repository/postgres/db"
 	httpauth "github.com/dovgalb/project-rupor/internal/auth/transport/http"
+	authmw "github.com/dovgalb/project-rupor/internal/auth/transport/http/middleware"
 	"github.com/dovgalb/project-rupor/internal/auth/usecase"
+	httpxmw "github.com/dovgalb/project-rupor/pkg/httpx/middleware"
 )
 
 const (
@@ -98,6 +101,21 @@ func run(cfg *config.Config, logger *slog.Logger) error {
 	meUC := usecase.NewGetCurrentUser(userRepo)
 
 	mux := chi.NewRouter()
+
+	uuidGen := func() string { return uuid.New().String() }
+	userIDHook := func(ctx context.Context) []slog.Attr {
+		uid, ok := authmw.UserIDFromContext(ctx)
+		if !ok {
+			return nil
+		}
+		return []slog.Attr{slog.String("user_id", uid.String())}
+	}
+
+	mux.Use(httpxmw.RequestID(uuidGen))
+	mux.Use(httpxmw.Recover(logger))
+	mux.Use(httpxmw.Logger(logger, userIDHook))
+	mux.Use(httpxmw.CORS(cfg.CORSAllowedOrigins(), false))
+
 	mux.Route("/api/v1", func(r chi.Router) {
 		r.Get("/health", healthHandler)
 		httpauth.RegisterRoutes(r, httpauth.Deps{

@@ -2,35 +2,25 @@ package httpauth
 
 import (
 	"net/http"
-	"strings"
 
 	"github.com/dovgalb/project-rupor/internal/auth/domain"
+	authmw "github.com/dovgalb/project-rupor/internal/auth/transport/http/middleware"
 	"github.com/dovgalb/project-rupor/internal/auth/usecase"
 )
 
-const bearerPrefix = "Bearer "
-
 type MeHandler struct {
-	uc     *usecase.GetCurrentUser
-	issuer usecase.TokenIssuer
-	clock  usecase.Clock
+	uc *usecase.GetCurrentUser
 }
 
-func NewMeHandler(uc *usecase.GetCurrentUser, issuer usecase.TokenIssuer, clock usecase.Clock) *MeHandler {
-	return &MeHandler{uc: uc, issuer: issuer, clock: clock}
+func NewMeHandler(uc *usecase.GetCurrentUser) *MeHandler {
+	return &MeHandler{uc: uc}
 }
 
 func (h *MeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	auth := r.Header.Get("Authorization")
-	if !strings.HasPrefix(auth, bearerPrefix) || len(auth) <= len(bearerPrefix) {
+	uid, ok := authmw.UserIDFromContext(r.Context())
+	if !ok {
+		// Защитная ветка: handler оказался без RequireAuth по ошибке маршрутизации.
 		writeError(w, mapError(domain.ErrAccessTokenInvalid))
-		return
-	}
-	token := auth[len(bearerPrefix):]
-
-	uid, err := h.issuer.VerifyAccess(token, h.clock.Now())
-	if err != nil {
-		writeError(w, mapError(err))
 		return
 	}
 
