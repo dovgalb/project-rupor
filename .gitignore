@@ -27,3 +27,6 @@ Thumbs.db
 
 # tmp
 /tmp/
+
+# local_tasks
+/tasks

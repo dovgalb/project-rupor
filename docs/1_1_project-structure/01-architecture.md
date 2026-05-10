@@ -10,18 +10,22 @@ view: logical
 На уровне system context фича `project-structure` не вводит новых внешних систем — она описывает скелет системы Rupor. Контекст показан таким, каким он будет к концу Фазы 1.1: сервер запускается локально, ходит в локальный PostgreSQL, разработчик использует `make`/`git`/`docker compose` через CLI.
 
 ```mermaid
-C4Context
-    title System Context — Project Structure (post Фаза 1.1)
+%% System Context — Project Structure (post Фаза 1.1)
+flowchart LR
+    dev(["«person»<br/>Developer<br/>Запускает сервис локально,<br/>гоняет миграции и тесты"]):::persona
+    rupor["«system»<br/>Rupor API<br/>Go HTTP сервер (chi)<br/>Health-check, конфиг, graceful shutdown"]:::system
+    pg[("«system_db»<br/>PostgreSQL 16<br/>Локальная БД через docker compose")]:::db
+    gh["«external_system»<br/>GitHub Actions<br/>CI: build + test + lint (push/PR)"]:::ext
 
-    Person(dev, "Developer", "Запускает сервис локально, гоняет миграции и тесты")
-    System(rupor, "Rupor API", "Go HTTP сервер (chi). Health-check, конфиг, graceful shutdown")
-    SystemDb(postgres, "PostgreSQL 16", "Локальная БД, поднимается через docker compose")
-    System_Ext(github, "GitHub Actions", "CI: build + test + lint при push/PR")
+    dev -->|"make run<br/>curl /api/v1/health"| rupor
+    dev -->|"make migrate-up / migrate-down"| pg
+    rupor -.->|"(не используется в фазе 1.1)<br/>ENV: DATABASE_URL"| pg
+    gh -->|"go build / go test / golangci-lint"| rupor
 
-    Rel(dev, rupor, "make run, curl /api/v1/health")
-    Rel(dev, postgres, "make migrate-up / migrate-down")
-    Rel(rupor, postgres, "(пока не используется в этой фиче)", "ENV: DATABASE_URL")
-    Rel(github, rupor, "go build / go test / golangci-lint")
+    classDef persona fill:#08427b,color:#fff,stroke:#073b6f,stroke-width:1px
+    classDef system  fill:#1168bd,color:#fff,stroke:#0b4884,stroke-width:1px
+    classDef db      fill:#1168bd,color:#fff,stroke:#0b4884,stroke-width:1px
+    classDef ext     fill:#999999,color:#fff,stroke:#6b6b6b,stroke-width:1px
 ```
 
 Акторы:
@@ -38,21 +42,25 @@ C4Context
 Контейнеры в смысле C4 — это процессы и хранилища. На этой фазе их два: API-сервер и БД.
 
 ```mermaid
-C4Container
-    title Container Diagram — Project Structure
+%% Container Diagram — Project Structure
+flowchart LR
+    dev(["«person»<br/>Developer"]):::persona
+    gh["«external_system»<br/>GitHub Actions CI"]:::ext
 
-    Person(dev, "Developer")
-    System_Ext(github, "GitHub Actions CI")
+    subgraph rupor["Rupor (monorepo)"]
+        api["«container»<br/>API Server<br/>Go 1.25, chi, log/slog<br/>HTTP /api/v1/*<br/>graceful shutdown SIGTERM/SIGINT"]:::system
+        db[("«container_db»<br/>PostgreSQL 16<br/>docker compose: postgres<br/>миграции golang-migrate из migrations/")]:::db
+    end
 
-    Container_Boundary(rupor, "Rupor (monorepo)") {
-        Container(api, "API Server", "Go 1.25, chi, log/slog", "HTTP /api/v1/*, graceful shutdown по SIGTERM/SIGINT")
-        ContainerDb(db, "PostgreSQL 16", "docker compose сервис postgres", "Накатываются миграции golang-migrate из migrations/")
-    }
+    dev -->|"make run, curl (HTTP)"| api
+    dev -->|"make migrate-up<br/>(golang-migrate CLI)"| db
+    api -.->|"pgx (будущее)"| db
+    gh -->|"go build / test / lint<br/>(Actions runner)"| api
 
-    Rel(dev, api, "make run, curl", "HTTP")
-    Rel(dev, db, "make migrate-up", "golang-migrate CLI")
-    Rel(api, db, "(не используется в этой фиче)", "pgx (будущее)")
-    Rel(github, api, "go build / test / lint", "Actions runner")
+    classDef persona fill:#08427b,color:#fff,stroke:#073b6f,stroke-width:1px
+    classDef system  fill:#1168bd,color:#fff,stroke:#0b4884,stroke-width:1px
+    classDef db      fill:#1168bd,color:#fff,stroke:#0b4884,stroke-width:1px
+    classDef ext     fill:#999999,color:#fff,stroke:#6b6b6b,stroke-width:1px
 ```
 
 Затрагиваемые контейнеры:

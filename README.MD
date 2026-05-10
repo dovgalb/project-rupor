@@ -34,7 +34,7 @@ curl http://localhost:8080/api/v1/health
 Список всех команд: `make help`.
 
 См. также:
-- Архитектура и решения: [docs/project-structure/](docs/project-structure/)
+- Архитектура и решения: [docs/project-structure/](docs/1_1_project-structure/)
 - Стандарты кода: [prompts/](prompts/)
 
 ## процесс запуска

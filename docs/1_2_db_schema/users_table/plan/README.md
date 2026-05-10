@@ -19,7 +19,7 @@ status: draft
 
 | # | Фаза | Слой | Зависимости | Status |
 |---|------|------|-------------|--------|
-| 1 | [Создать миграцию `0002_users`](./phase-01.md) | migrations | `0001_init` (`pgcrypto`) уже накатан | ☐ |
+| 1 | [Создать миграцию `0002_users`](phase-01.md) | migrations | `0001_init` (`pgcrypto`) уже накатан | ☐ |
 
 ## File Map
 

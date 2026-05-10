@@ -98,9 +98,9 @@ WS     /api/v1/ws?token=<jwt>
 
 ### 1.2 Схема БД
 - [x] Подключён `pgcrypto` (миграция `0001_init`)
-- [ ] Миграция: таблица `users` (id, email, password_hash, username, created_at)
-- [ ] Миграция: таблица `refresh_tokens` (если хранятся в БД)
-- [ ] Индексы на email/username
+- [x] Миграция: таблица `users` (id, email, password_hash, username, created_at)
+- [x] Миграция: таблица `refresh_tokens` (если хранятся в БД)
+- [x] Индексы на email/username
 
 ### 1.3 Домен auth
 - [ ] `internal/auth/domain/`: сущности `User`, value objects (`Email`, `Password`), доменные ошибки

@@ -21,7 +21,7 @@ status: draft
 
 | # | Фаза | Слой | Зависимости | Status |
 |---|------|------|-------------|--------|
-| 1 | [Создать миграцию `0003_refresh_tokens`](./phase-01.md) | migrations | `0001_init` (`pgcrypto`) и `0002_users` (таблица `users`) уже накатаны | ☐ |
+| 1 | [Создать миграцию `0003_refresh_tokens`](phase-01.md) | migrations | `0001_init` (`pgcrypto`) и `0002_users` (таблица `users`) уже накатаны | ☐ |
 
 ## File Map
 

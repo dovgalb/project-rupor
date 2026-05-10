@@ -38,10 +38,10 @@ Scope строго ограничен SQL-миграцией. Доменные �
 
 | Файл | Разрез | Описание |
 |------|--------|----------|
-| [03-decisions.md](./03-decisions.md) | Decision | Решения по схеме (хеш vs raw, FK с CASCADE, ротация через `revoked_at`, индексы), альтернативы и риски |
-| [06-repo-model.md](./06-repo-model.md) | Repository | DDL таблицы `refresh_tokens`, имена объектов БД, плановый mapping на будущий домен `auth` (1.3), соответствие `prompts/RepoModel.txt` |
-| [plan/README.md](./plan/README.md) | Plan | Стратегия фаз, file map, success criteria *(создаётся после approval дизайна)* |
-| [plan/phase-01.md](./plan/phase-01.md) | Plan | Создание `migrations/0003_refresh_tokens.up.sql` и `.down.sql` *(создаётся после approval дизайна)* |
+| [03-decisions.md](03-decisions.md) | Decision | Решения по схеме (хеш vs raw, FK с CASCADE, ротация через `revoked_at`, индексы), альтернативы и риски |
+| [06-repo-model.md](06-repo-model.md) | Repository | DDL таблицы `refresh_tokens`, имена объектов БД, плановый mapping на будущий домен `auth` (1.3), соответствие `prompts/RepoModel.txt` |
+| [plan/README.md](plan/README.md) | Plan | Стратегия фаз, file map, success criteria *(создаётся после approval дизайна)* |
+| [plan/phase-01.md](plan/phase-01.md) | Plan | Создание `migrations/0003_refresh_tokens.up.sql` и `.down.sql` *(создаётся после approval дизайна)* |
 
 ### Намеренно опущенные документы шаблона
 

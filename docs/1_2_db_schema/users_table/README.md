@@ -32,10 +32,10 @@ Scope строго ограничен задачей 1.2 из плана MVP (`.
 
 | Файл | Разрез | Описание |
 |------|--------|----------|
-| [03-decisions.md](./03-decisions.md) | Decision | Решения по схеме (типы, имена ограничений, расширения), альтернативы и риски |
-| [06-repo-model.md](./06-repo-model.md) | Repository | DDL таблицы `users`, mapping на будущий домен `auth`, соответствие `prompts/RepoModel.txt` |
-| [plan/README.md](./plan/README.md) | Plan | Стратегия фаз, file map, success criteria |
-| [plan/phase-01.md](./plan/phase-01.md) | Plan | Создание `migrations/0002_users.up.sql` и `.down.sql` |
+| [03-decisions.md](03-decisions.md) | Decision | Решения по схеме (типы, имена ограничений, расширения), альтернативы и риски |
+| [06-repo-model.md](06-repo-model.md) | Repository | DDL таблицы `users`, mapping на будущий домен `auth`, соответствие `prompts/RepoModel.txt` |
+| [plan/README.md](plan/README.md) | Plan | Стратегия фаз, file map, success criteria |
+| [plan/phase-01.md](plan/phase-01.md) | Plan | Создание `migrations/0002_users.up.sql` и `.down.sql` |
 
 ### Намеренно опущенные документы шаблона
 
