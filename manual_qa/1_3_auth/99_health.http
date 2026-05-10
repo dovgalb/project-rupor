@@ -1,0 +1,7 @@
+### GET /api/v1/health — liveness probe.
+
+@host = http://localhost:8080
+
+
+### 200 OK
+GET {{host}}/api/v1/health

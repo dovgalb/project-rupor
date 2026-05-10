@@ -1,0 +1,58 @@
+### POST /api/v1/auth/refresh
+### Залогиньтесь через 02_login.http и подставьте refreshToken вручную в @refreshToken,
+### либо запускайте 00_flow.http — там цепочка собирается автоматически.
+
+@host = http://localhost:8080
+@refreshToken = qCZZAVfTKkjvCIORckQT-TIV_mF--xxCV7PwAV6TPVc
+
+
+### 200 OK — happy path
+POST {{host}}/api/v1/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "{{refreshToken}}"
+}
+
+
+### 401, AUTH-008 — refresh token revoked (повторный запуск со старым токеном после ротации)
+POST {{host}}/api/v1/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "{{refreshToken}}"
+}
+
+
+### 401, AUTH-007 — refresh token not found (валидный base64url 32 байта, но в БД его нет)
+POST {{host}}/api/v1/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+}
+
+
+### 401, AUTH-007 — невалидный base64
+POST {{host}}/api/v1/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "!!!not-base64!!!"
+}
+
+
+### 401, AUTH-007 — длина после base64-декода != 32
+POST {{host}}/api/v1/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "c2hvcnQ"
+}
+
+
+### 400, AUTH-012 — malformed body
+POST {{host}}/api/v1/auth/refresh
+Content-Type: application/json
+
+{not-json

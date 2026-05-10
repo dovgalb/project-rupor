@@ -1,0 +1,53 @@
+### POST /api/v1/auth/login
+### Перед запуском убедитесь, что пользователь существует (см. 01_register.http или 00_flow.http).
+
+@host = http://localhost:8080
+@email = qa-register@example.com
+@password = qa-pass-12345
+
+
+### 200 OK — happy path
+POST {{host}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "{{password}}"
+}
+
+
+### 401, AUTH-006 — wrong password
+POST {{host}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "wrong-pass-9999"
+}
+
+
+### 401, AUTH-006 — несуществующий email (timing-safe: тот же код)
+POST {{host}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "missing-{{$timestamp}}@example.com",
+  "password": "{{password}}"
+}
+
+
+### 401, AUTH-006 — невалидный формат email (тоже сводится к InvalidCredentials)
+POST {{host}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "x",
+  "password": "{{password}}"
+}
+
+
+### 400, AUTH-012 — malformed body
+POST {{host}}/api/v1/auth/login
+Content-Type: application/json
+
+{

@@ -1,0 +1,83 @@
+### POST /api/v1/auth/register
+
+@host = http://localhost:8080
+@email = qa-register@example.com
+@username = qa_register
+@password = qa-pass-12345
+
+
+### 201 Created — happy path
+POST {{host}}/api/v1/auth/register
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "username": "{{username}}",
+  "password": "{{password}}"
+}
+
+
+### 409 Conflict, AUTH-004 — email already taken (повторно тот же email)
+POST {{host}}/api/v1/auth/register
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "username": "qa_register_other",
+  "password": "qa-pass-12345"
+}
+
+
+### 409 Conflict, AUTH-005 — username already taken (другой email, тот же username)
+POST {{host}}/api/v1/auth/register
+Content-Type: application/json
+
+{
+  "email": "qa-register-other@example.com",
+  "username": "{{username}}",
+  "password": "qa-pass-12345"
+}
+
+
+### 400, AUTH-001 — invalid email
+POST {{host}}/api/v1/auth/register
+Content-Type: application/json
+
+{
+  "email": "not-email",
+  "username": "qa_user_2",
+  "password": "qa-pass-12345"
+}
+
+
+### 400, AUTH-002 — invalid username (короче 3)
+POST {{host}}/api/v1/auth/register
+Content-Type: application/json
+
+{
+  "email": "qa-shortname@example.com",
+  "username": "ab",
+  "password": "qa-pass-12345"
+}
+
+
+### 400, AUTH-003 — invalid password (короче 8)
+POST {{host}}/api/v1/auth/register
+Content-Type: application/json
+
+{
+  "email": "qa-shortpass@example.com",
+  "username": "qa_user_3",
+  "password": "1234"
+}
+
+
+### 400, AUTH-012 — malformed body
+POST {{host}}/api/v1/auth/register
+Content-Type: application/json
+
+{not-json
+
+
+### 405 Method Not Allowed — GET вместо POST
+GET {{host}}/api/v1/auth/register
