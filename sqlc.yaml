@@ -1,2 +1,27 @@
 version: "2"
-sql: []
+sql:
+  - engine: "postgresql"
+    schema: "migrations"
+    queries: "internal/auth/repository/postgres/queries"
+    gen:
+      go:
+        sql_package: "pgx/v5"
+        package: "db"
+        out: "internal/auth/repository/postgres/db"
+        emit_interface: false
+        emit_json_tags: false
+        emit_db_tags: false
+        emit_pointers_for_null_types: false
+        emit_prepared_queries: false
+        overrides:
+          - db_type: "uuid"
+            nullable: false
+            go_type:
+              import: "github.com/google/uuid"
+              type: "UUID"
+          - db_type: "timestamptz"
+            nullable: false
+            go_type: "time.Time"
+          - db_type: "pg_catalog.timestamptz"
+            nullable: false
+            go_type: "time.Time"

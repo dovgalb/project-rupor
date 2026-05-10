@@ -227,42 +227,63 @@ Frontmatter: `parent: ./README.md`, `view: logical`.
 Разделы:
 
 **`## C4 Level 1 — System Context`**
-КТО взаимодействует с системой и КАКИЕ внешние системы участвуют. Mermaid `C4Context`-диаграмма + описание (акторы, границы, внешние зависимости).
+КТО взаимодействует с системой и КАКИЕ внешние системы участвуют. Mermaid `flowchart LR` со стилевыми классами под C4 + описание (акторы, границы, внешние зависимости).
+
+**Важно: НЕ использовать `C4Context` / `C4Container`** — это experimental-блоки Mermaid с наивным layout, у них наезжают подписи стрелок и нод. Используем `flowchart LR` с классами `persona`, `system`, `db`, `ext` и стереотипами `«person»` / `«system»` / `«system_db»` / `«external_system»` в подписях нод — рендер стабилен везде (GitHub, VS Code, Obsidian).
 
 Шаблон диаграммы:
 
 ```
-C4Context
-    title System Context — {Feature Name}
+%% System Context — {Feature Name}
+flowchart LR
+    user(["«person»<br/>User<br/>Описание"]):::persona
+    rupor["«system»<br/>Rupor<br/>Коммуникационная платформа"]:::system
+    ext["«external_system»<br/>External System<br/>Описание"]:::ext
 
-    Person(user, "User", "Описание")
-    System(rupor, "Rupor", "Коммуникационная платформа")
-    System_Ext(ext, "External System", "Описание")
+    user -->|использует| rupor
+    rupor -->|вызывает| ext
 
-    Rel(user, rupor, "Использует")
-    Rel(rupor, ext, "Вызывает")
+    classDef persona fill:#08427b,color:#fff,stroke:#073b6f,stroke-width:1px
+    classDef system  fill:#1168bd,color:#fff,stroke:#0b4884,stroke-width:1px
+    classDef db      fill:#1168bd,color:#fff,stroke:#0b4884,stroke-width:1px
+    classDef ext     fill:#999999,color:#fff,stroke:#6b6b6b,stroke-width:1px
 ```
 
+Если на L1 есть БД, использовать форму цилиндра: `pg[("«system_db»<br/>PostgreSQL 16<br/>Описание")]:::db`.
+
 **`## C4 Level 2 — Containers`**
-КАКИЕ контейнеры/процессы участвуют и КАК они общаются. Mermaid `C4Container`-диаграмма.
+КАКИЕ контейнеры/процессы участвуют и КАК они общаются. Mermaid `flowchart LR` с `subgraph` под границу системы и теми же стилевыми классами. **`C4Container` не используем** — по той же причине, что и `C4Context`.
 
 Шаблон:
 
 ```
-C4Container
-    title Container Diagram — {Feature Name}
+%% Container Diagram — {Feature Name}
+flowchart LR
+    user(["«person»<br/>User"]):::persona
+    browser["«container»<br/>Browser<br/>React + Vite + Zustand"]:::ext
 
-    Person(user, "User")
-    Container_Boundary(rupor, "Rupor") {
-        Container(api, "API Server", "Go + chi", "HTTP + WebSocket")
-        ContainerDb(db, "PostgreSQL", "Хранит данные платформы")
-    }
-    Container_Ext(browser, "Browser", "React + Vite + Zustand")
+    subgraph rupor["Rupor"]
+        api["«container»<br/>API Server<br/>Go + chi<br/>HTTP + WebSocket"]:::system
+        db[("«container_db»<br/>PostgreSQL<br/>Хранит данные платформы")]:::db
+    end
 
-    Rel(user, browser, "Открывает UI")
-    Rel(browser, api, "HTTPS / WSS")
-    Rel(api, db, "SQL / sqlc")
+    user -->|открывает UI| browser
+    browser -->|"HTTPS / WSS"| api
+    api -->|"SQL / sqlc"| db
+
+    classDef persona fill:#08427b,color:#fff,stroke:#073b6f,stroke-width:1px
+    classDef system  fill:#1168bd,color:#fff,stroke:#0b4884,stroke-width:1px
+    classDef db      fill:#1168bd,color:#fff,stroke:#0b4884,stroke-width:1px
+    classDef ext     fill:#999999,color:#fff,stroke:#6b6b6b,stroke-width:1px
 ```
+
+Условные обозначения по классам:
+- `persona` (тёмно-синий, форма stadium `(["..."])`) — пользователи, акторы.
+- `system` (синий, прямоугольник) — наша система или контейнер внутри неё.
+- `db` (синий, цилиндр `[("...")]`) — БД (`system_db` / `container_db`).
+- `ext` (серый, прямоугольник) — внешние системы / external контейнеры.
+
+Подписи рёбер делать короткими — длинные технологические аннотации разносить на две строки через `<br/>` внутри label.
 
 Затем перечислить:
 - Затрагиваемые контейнеры (`cmd/server`, `internal/<domain>`, `web/`, `migrations/`, `pkg/websocket`)
@@ -722,7 +743,7 @@ Frontmatter: `phase: N`, `name`, `layer` (domain | usecase | transport | reposit
 
 1. **Дизайн до кода** — никогда не прыгать в детали реализации на этапе 2
 2. **Несколько файлов по разрезам** — разделять структуру (01), поведение (02), решения (03), тестирование (04). НИКОГДА не складывать всё в один файл
-3. **Mermaid для всех диаграмм** — рендерится, версионируется, поддерживает diff
+3. **Mermaid для всех диаграмм** — рендерится, версионируется, поддерживает diff. Для C4 L1/L2 использовать `flowchart LR` со стилевыми классами под C4 (см. шаблоны в 01-architecture); НЕ использовать experimental-блоки `C4Context` / `C4Container` — у них наезжают подписи
 4. **Ссылки file:line** — каждая ссылка на существующий код содержит точное расположение
 5. **Факты в ресерче, решения в дизайне** — ресерч объективен, дизайн содержит мнение
 6. **Два гейта утверждения** — утверждение дизайна И утверждение плана кода до реализации

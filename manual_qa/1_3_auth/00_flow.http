@@ -1,0 +1,59 @@
+### Happy-path сценарий: register -> login -> me -> refresh -> me с новым access.
+### Запускать запросы по порядку. access/refresh-токены автоматически переиспользуются (VS Code REST Client).
+
+@host = http://localhost:8080
+@email = flow-{{$timestamp}}@example.com
+@username = flow_{{$timestamp}}
+@password = flow-pass-12345
+
+
+### 1. Register — 201 Created
+# @name register
+POST {{host}}/api/v1/auth/register
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "username": "{{username}}",
+  "password": "{{password}}"
+}
+
+
+### 2. Login — 200 OK, забираем accessToken и refreshToken
+# @name login
+POST {{host}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "{{password}}"
+}
+
+
+### 3. Me с access — 200 OK
+GET {{host}}/api/v1/auth/me
+Authorization: Bearer {{login.response.body.accessToken}}
+
+
+### 4. Refresh — 200 OK, ротация: новый accessToken + новый refreshToken
+# @name refresh
+POST {{host}}/api/v1/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "{{login.response.body.refreshToken}}"
+}
+
+
+### 5. Me с новым access — 200 OK
+GET {{host}}/api/v1/auth/me
+Authorization: Bearer {{refresh.response.body.accessToken}}
+
+
+### 6. Refresh старым (уже rotate'нутым) — 401 AUTH-008
+POST {{host}}/api/v1/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "{{login.response.body.refreshToken}}"
+}

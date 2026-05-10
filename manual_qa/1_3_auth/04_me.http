@@ -1,0 +1,42 @@
+### GET /api/v1/auth/me
+### Залогиньтесь через 02_login.http и подставьте accessToken в @accessToken,
+### либо запускайте 00_flow.http — там Authorization заполняется автоматически.
+
+@host = http://localhost:8080
+@accessToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2NDhhMDJiZC1hNDZjLTQyZDItOGE1MS0wMGMyZTI2ZWJlMDEiLCJleHAiOjE3Nzg0MTY2NzYsImlhdCI6MTc3ODQxNTc3Nn0.ulD2rnPD_yiy1H3lAsS7bp1ojJRhGQE184t4S4olOR8
+
+
+### 200 OK — happy path
+GET {{host}}/api/v1/auth/me
+Authorization: Bearer {{accessToken}}
+
+
+### 401, AUTH-010 — нет заголовка Authorization
+GET {{host}}/api/v1/auth/me
+
+
+### 401, AUTH-010 — пустой Bearer
+GET {{host}}/api/v1/auth/me
+Authorization: Bearer
+
+
+### 401, AUTH-010 — неверная схема
+GET {{host}}/api/v1/auth/me
+Authorization: Basic dXNlcjpwYXNz
+
+
+### 401, AUTH-010 — мусор вместо JWT
+GET {{host}}/api/v1/auth/me
+Authorization: Bearer not-a-jwt
+
+
+### 401, AUTH-010 — испорченная подпись
+GET {{host}}/api/v1/auth/me
+Authorization: Bearer {{accessToken}}AAAA
+
+
+### 401, AUTH-011 — истёкший токен (взять токен старше 15 минут или подменить exp в payload)
+### Этот сценарий проще проверять интеграционным тестом TestMeHandler_TokenExpired —
+### для ручного варианта дождитесь истечения accessTTL = 15m или уменьшите его в env.
+GET {{host}}/api/v1/auth/me
+Authorization: Bearer {{accessToken}}
