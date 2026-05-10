@@ -3,6 +3,7 @@ package config_test
 import (
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/dovgalb/project-rupor/config"
 )
@@ -109,6 +110,108 @@ func TestConfig_Load_InvalidPortFormat(t *testing.T) {
 	}
 	if verr.Field != "SERVER_PORT" {
 		t.Fatalf("Field = %q", verr.Field)
+	}
+}
+
+func TestConfig_Load_DefaultAccessTTL(t *testing.T) {
+	t.Parallel()
+
+	env := validEnv()
+	delete(env, "JWT_ACCESS_TTL")
+
+	cfg, err := config.Load(env)
+	if err != nil {
+		t.Fatalf("Load: unexpected error: %v", err)
+	}
+	if cfg.JWTAccessTTL() != 15*time.Minute {
+		t.Fatalf("JWTAccessTTL = %s, want 15m", cfg.JWTAccessTTL())
+	}
+}
+
+func TestConfig_Load_DefaultRefreshTTL(t *testing.T) {
+	t.Parallel()
+
+	env := validEnv()
+	delete(env, "JWT_REFRESH_TTL")
+
+	cfg, err := config.Load(env)
+	if err != nil {
+		t.Fatalf("Load: unexpected error: %v", err)
+	}
+	if cfg.JWTRefreshTTL() != 720*time.Hour {
+		t.Fatalf("JWTRefreshTTL = %s, want 720h", cfg.JWTRefreshTTL())
+	}
+}
+
+func TestConfig_Load_InvalidAccessTTL(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		raw  string
+	}{
+		{"не парсится", "abc"},
+		{"отрицательный", "-1m"},
+		{"ноль", "0s"},
+		{"больше верхней границы 1h", "2h"},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			env := validEnv()
+			env["JWT_ACCESS_TTL"] = tc.raw
+
+			_, err := config.Load(env)
+			if !errors.Is(err, config.ErrConfigInvalid) {
+				t.Fatalf("raw %q: err is not ErrConfigInvalid: %v", tc.raw, err)
+			}
+			var verr config.ValidationError
+			if !errors.As(err, &verr) {
+				t.Fatalf("raw %q: err is not ValidationError: %v", tc.raw, err)
+			}
+			if verr.Code != "CONFIG-004" {
+				t.Fatalf("raw %q: Code = %q, want CONFIG-004", tc.raw, verr.Code)
+			}
+		})
+	}
+}
+
+func TestConfig_Load_InvalidRefreshTTL(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		raw  string
+	}{
+		{"не парсится", "abc"},
+		{"отрицательный", "-1h"},
+		{"больше верхней границы 90d", "2400h"},
+		{"меньше access default 15m", "1m"},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			env := validEnv()
+			env["JWT_REFRESH_TTL"] = tc.raw
+
+			_, err := config.Load(env)
+			if !errors.Is(err, config.ErrConfigInvalid) {
+				t.Fatalf("raw %q: err is not ErrConfigInvalid: %v", tc.raw, err)
+			}
+			var verr config.ValidationError
+			if !errors.As(err, &verr) {
+				t.Fatalf("raw %q: err is not ValidationError: %v", tc.raw, err)
+			}
+			if verr.Code != "CONFIG-005" {
+				t.Fatalf("raw %q: Code = %q, want CONFIG-005", tc.raw, verr.Code)
+			}
+		})
 	}
 }
 
