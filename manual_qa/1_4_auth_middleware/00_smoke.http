@@ -1,0 +1,26 @@
+@host = http://localhost:8080
+
+### Health через middleware-stack
+GET {{host}}/api/v1/health
+
+# Проверить:
+# - Status 200
+# - Response header "X-Request-ID" присутствует, формат UUID v4
+# - Body: {"status":"ok"}
+# - В логах сервера: slog INFO с полями method=GET, path=/api/v1/health, status=200, duration, request_id
+
+### Health с клиентским X-Request-ID
+GET {{host}}/api/v1/health
+X-Request-ID: my-correlation-12345
+
+# Проверить:
+# - Response "X-Request-ID" совпадает с переданным "my-correlation-12345"
+# - В логах request_id="my-correlation-12345"
+
+### Любой неизвестный путь — 404 от chi (без JSON envelope)
+GET {{host}}/api/v1/nonexistent
+
+# Проверить:
+# - Status 404
+# - X-Request-ID присутствует (middleware подключилось до chi.NotFound)
+# - Body: "404 page not found\n" (chi default, plain text — это OK для 1.4)

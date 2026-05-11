@@ -145,3 +145,57 @@ func TestArchitecture_UsecaseUsedAsContract(t *testing.T) {
 	}
 	_ = usecasePath
 }
+
+func TestArchitecture_PkgHttpxImports(t *testing.T) {
+	t.Parallel()
+
+	allowed := map[string]struct{}{
+		modulePath + "/pkg/httpx": {},
+	}
+
+	dirs := []string{"pkg/httpx", "pkg/httpx/middleware"}
+	for _, dir := range dirs {
+		imports := collectImports(t, dir)
+		for file, ims := range imports {
+			for _, im := range ims {
+				if isStdlib(im) {
+					continue
+				}
+				if _, ok := allowed[im]; ok {
+					continue
+				}
+				if strings.HasPrefix(im, modulePath+"/internal/") {
+					t.Fatalf("%s/%s imports internal %q", dir, file, im)
+				}
+				t.Fatalf("%s/%s imports forbidden %q", dir, file, im)
+			}
+		}
+	}
+}
+
+func TestArchitecture_AuthMiddlewareImports(t *testing.T) {
+	t.Parallel()
+
+	allowed := map[string]struct{}{
+		"github.com/google/uuid":              {},
+		modulePath + "/internal/auth/usecase": {},
+		modulePath + "/internal/auth/domain":  {},
+		modulePath + "/pkg/httpx":             {},
+	}
+
+	imports := collectImports(t, "internal/auth/transport/http/middleware")
+	for file, ims := range imports {
+		for _, im := range ims {
+			if isStdlib(im) {
+				continue
+			}
+			if _, ok := allowed[im]; ok {
+				continue
+			}
+			if strings.HasPrefix(im, repoBase+"/") {
+				t.Fatalf("%s imports adapter %q", file, im)
+			}
+			t.Fatalf("%s imports forbidden %q", file, im)
+		}
+	}
+}

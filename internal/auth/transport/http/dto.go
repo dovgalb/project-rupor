@@ -42,15 +42,6 @@ type meResponse struct {
 	CreatedAt time.Time `json:"createdAt"`
 }
 
-type errorEnvelope struct {
-	Error errorBody `json:"error"`
-}
-
-type errorBody struct {
-	Code    string `json:"code"`
-	Message string `json:"message"`
-}
-
 func jsonDecode(r io.Reader, v any) error {
 	return json.NewDecoder(r).Decode(v)
 }

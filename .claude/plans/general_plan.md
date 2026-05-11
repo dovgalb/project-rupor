@@ -103,13 +103,13 @@ WS     /api/v1/ws?token=<jwt>
 - [x] Индексы на email/username
 
 ### 1.3 Домен auth
-- [ ] `internal/auth/domain/`: сущности `User`, value objects (`Email`, `Password`), доменные ошибки
-- [ ] `internal/auth/usecase/`: интерфейсы репозиториев + сценарии Register / Login / Refresh
-- [ ] Хеширование паролей (bcrypt)
-- [ ] Генерация и валидация JWT (access + refresh)
-- [ ] `internal/auth/repository/postgres/`: sqlc-запросы и реализация репозитория
-- [ ] `internal/auth/transport/http/`: хендлеры `POST /auth/register`, `/auth/login`, `/auth/refresh`, `GET /auth/me` + DTO
-- [ ] Подключение роутов в `cmd/server/main.go`
+- [x] `internal/auth/domain/`: сущности `User`, value objects (`Email`, `Password`), доменные ошибки
+- [x] `internal/auth/usecase/`: интерфейсы репозиториев + сценарии Register / Login / Refresh
+- [x] Хеширование паролей (bcrypt)
+- [x] Генерация и валидация JWT (access + refresh)
+- [x] `internal/auth/repository/postgres/`: sqlc-запросы и реализация репозитория
+- [x] `internal/auth/transport/http/`: хендлеры `POST /auth/register`, `/auth/login`, `/auth/refresh`, `GET /auth/me` + DTO
+- [x] Подключение роутов в `cmd/server/main.go`
 
 ### 1.4 Middleware
 - [ ] JWT-middleware (извлечение `Authorization: Bearer`, валидация, проброс userID в контекст)
