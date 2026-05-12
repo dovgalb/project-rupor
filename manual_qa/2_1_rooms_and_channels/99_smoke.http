@@ -1,0 +1,9 @@
+@host = http://localhost:8080
+
+### Health
+GET {{host}}/api/v1/health
+
+# Проверить:
+# - Status 200
+# - Body: {"status":"ok"}
+# - X-Request-ID присутствует

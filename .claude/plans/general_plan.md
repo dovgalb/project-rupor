@@ -112,10 +112,10 @@ WS     /api/v1/ws?token=<jwt>
 - [x] Подключение роутов в `cmd/server/main.go`
 
 ### 1.4 Middleware
-- [ ] JWT-middleware (извлечение `Authorization: Bearer`, валидация, проброс userID в контекст)
-- [ ] Логирование запросов
-- [ ] Recover middleware
-- [ ] CORS (для будущего фронта)
+- [x] JWT-middleware (извлечение `Authorization: Bearer`, валидация, проброс userID в контекст)
+- [x] Логирование запросов
+- [x] Recover middleware
+- [x] CORS (для будущего фронта)
 
 ### 1.5 Тесты
 - [ ] Unit-тесты usecase auth (с моками репо)

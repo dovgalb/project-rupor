@@ -1,0 +1,89 @@
+@host = http://localhost:8080
+@access_token_owner = <owner>
+@access_token_member = <member>
+@room_id = <room id>
+@channel_id = <получи из шага «create text channel»>
+
+### Owner создаёт text channel → 201
+POST {{host}}/api/v1/rooms/{{room_id}}/channels
+Authorization: Bearer {{access_token_owner}}
+Content-Type: application/json
+
+{
+  "name": "general",
+  "kind": "text"
+}
+
+# Status 201
+# Body: {"id":"...","roomId":"...","name":"general","kind":"text","createdAt":"..."}
+# Подставь id в @channel_id.
+
+### Owner создаёт voice channel → 201
+POST {{host}}/api/v1/rooms/{{room_id}}/channels
+Authorization: Bearer {{access_token_owner}}
+Content-Type: application/json
+
+{
+  "name": "voice-room",
+  "kind": "voice"
+}
+
+# Status 201
+
+### Member пытается создать → 403 CHANNEL-007
+POST {{host}}/api/v1/rooms/{{room_id}}/channels
+Authorization: Bearer {{access_token_member}}
+Content-Type: application/json
+
+{
+  "name": "off-topic",
+  "kind": "text"
+}
+
+# Status 403
+# Body: {"error":{"code":"CHANNEL-007","message":"insufficient role: admin or owner required"}}
+
+### Неподдерживаемый kind → 400 CHANNEL-002
+POST {{host}}/api/v1/rooms/{{room_id}}/channels
+Authorization: Bearer {{access_token_owner}}
+Content-Type: application/json
+
+{
+  "name": "video-call",
+  "kind": "video"
+}
+
+# Status 400
+# Body: {"error":{"code":"CHANNEL-002","message":"invalid channel kind"}}
+
+### Дубликат имени → 409 CHANNEL-004
+POST {{host}}/api/v1/rooms/{{room_id}}/channels
+Authorization: Bearer {{access_token_owner}}
+Content-Type: application/json
+
+{
+  "name": "general",
+  "kind": "text"
+}
+
+# Status 409
+# Body: {"error":{"code":"CHANNEL-004","message":"channel name already taken"}}
+
+### GET список каналов (member тоже видит) → 200
+GET {{host}}/api/v1/rooms/{{room_id}}/channels
+Authorization: Bearer {{access_token_member}}
+
+# Status 200
+# Body: {"items":[{...},{...}]}
+
+### Owner удаляет канал → 204
+DELETE {{host}}/api/v1/rooms/{{room_id}}/channels/{{channel_id}}
+Authorization: Bearer {{access_token_owner}}
+
+# Status 204, без тела
+
+### Member пытается удалить → 403 CHANNEL-007
+DELETE {{host}}/api/v1/rooms/{{room_id}}/channels/{{channel_id}}
+Authorization: Bearer {{access_token_member}}
+
+# Status 403, CHANNEL-007

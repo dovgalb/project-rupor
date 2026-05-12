@@ -1,0 +1,28 @@
+@host = http://localhost:8080
+@access_token_owner = <owner>
+@access_token_admin = <admin (не owner)>
+@room_id = <room id>
+
+### Owner удаляет комнату → 204 (CASCADE на channels, room_members, invites)
+DELETE {{host}}/api/v1/rooms/{{room_id}}
+Authorization: Bearer {{access_token_owner}}
+
+# Status 204, без тела
+# В БД: rooms, room_members, invites, channels по этой room — снесены.
+
+### Повторное удаление → 404 ROOM-002
+DELETE {{host}}/api/v1/rooms/{{room_id}}
+Authorization: Bearer {{access_token_owner}}
+
+# Status 404
+# Body: {"error":{"code":"ROOM-002","message":"room not found"}}
+# (Note: после CASCADE membership owner тоже снесён, поэтому FindByPair вернёт ErrNotMember
+# раньше Delete. Если в системе нет такого admin — будет 403 ROOM-003. Сценарий ниже —
+# отдельная свежая комната с admin.)
+
+### Admin пытается удалить → 403 ROOM-005
+DELETE {{host}}/api/v1/rooms/{{room_id}}
+Authorization: Bearer {{access_token_admin}}
+
+# Status 403
+# Body: {"error":{"code":"ROOM-005","message":"only owner can delete room"}}
