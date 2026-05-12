@@ -1,0 +1,32 @@
+@host = http://localhost:8080
+@access_token_a = <user A token>
+@access_token_b = <user B token, без membership в @room_id>
+@room_id = <room id, где member только user A>
+
+### GET список комнат user A → 200
+GET {{host}}/api/v1/rooms
+Authorization: Bearer {{access_token_a}}
+
+# Status 200
+# Body: {"items":[{"id":"...","ownerId":"...","name":"...","createdAt":"...","role":"owner"}]}
+
+### GET комната по id (user A — owner) → 200
+GET {{host}}/api/v1/rooms/{{room_id}}
+Authorization: Bearer {{access_token_a}}
+
+# Status 200
+# Body: roomResponse
+
+### GET комната user B (не member) → 403 ROOM-003
+GET {{host}}/api/v1/rooms/{{room_id}}
+Authorization: Bearer {{access_token_b}}
+
+# Status 403
+# Body: {"error":{"code":"ROOM-003","message":"not a member"}}
+
+### GET с битым UUID → 404 ROOM-002
+GET {{host}}/api/v1/rooms/not-a-uuid
+Authorization: Bearer {{access_token_a}}
+
+# Status 404
+# Body: {"error":{"code":"ROOM-002","message":"room not found"}}

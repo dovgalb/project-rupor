@@ -1,0 +1,115 @@
+@host = http://localhost:8080
+@access_token_a =  <получи из шага login user A ниже>
+@access_token_b = <получи из шага login user B ниже>
+@room_id = <получи из шага create room ниже>
+@invite_code = <получи из шага invite ниже>
+@channel_id = <получи из шага create channel ниже>
+
+### 1. Register user A
+POST {{host}}/api/v1/auth/register
+Content-Type: application/json
+
+{
+  "email": "alice@example.com",
+  "username": "alice",
+  "password": "correct-pass-123"
+}
+
+# Status 200, body: {"id":"<uuid>","email":"alice@example.com",...}
+
+### 2. Register user B
+POST {{host}}/api/v1/auth/register
+Content-Type: application/json
+
+{
+  "email": "bob@example.com",
+  "username": "bob",
+  "password": "correct-pass-123"
+}
+
+# Status 200
+
+### 3. Login user A → @access_token_a
+POST {{host}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "alice@example.com",
+  "password": "correct-pass-123"
+}
+
+# Status 200, body содержит accessToken — подставь в @access_token_a
+
+### 4. Login user B → @access_token_b
+POST {{host}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "bob@example.com",
+  "password": "correct-pass-123"
+}
+
+# Status 200, accessToken → @access_token_b
+
+### 5. User A создаёт комнату → @room_id
+POST {{host}}/api/v1/rooms
+Authorization: Bearer {{access_token_a}}
+Content-Type: application/json
+
+{
+  "name": "general"
+}
+
+# Status 201, body: {"id":"<uuid>","ownerId":"<uid_a>","name":"general","createdAt":...}
+# Подставь id в @room_id
+
+### 6. User A выпускает invite → @invite_code
+POST {{host}}/api/v1/rooms/{{room_id}}/invite
+Authorization: Bearer {{access_token_a}}
+
+# Status 200, body: {"code":"XXXXXXXX","createdBy":"<uid_a>","createdAt":...}
+# Подставь code в @invite_code
+
+### 7. User B принимает invite (становится member)
+POST {{host}}/api/v1/rooms/join/{{invite_code}}
+Authorization: Bearer {{access_token_b}}
+
+# Status 200, body: room object (id, ownerId, name, createdAt)
+
+### 8. User A создаёт канал → @channel_id
+POST {{host}}/api/v1/rooms/{{room_id}}/channels
+Authorization: Bearer {{access_token_a}}
+Content-Type: application/json
+
+{
+  "name": "general",
+  "kind": "text"
+}
+
+# Status 201, body: {"id":"<uuid>","roomId":"<room_id>","name":"general","kind":"text","createdAt":...}
+# Подставь id в @channel_id
+
+### 9. User B видит список каналов
+GET {{host}}/api/v1/rooms/{{room_id}}/channels
+Authorization: Bearer {{access_token_b}}
+
+# Status 200, body: {"items":[{...один канал...}]}
+
+### 10. User A удаляет канал
+DELETE {{host}}/api/v1/rooms/{{room_id}}/channels/{{channel_id}}
+Authorization: Bearer {{access_token_a}}
+
+# Status 204, без тела
+
+### 11. User A удаляет комнату (CASCADE удалит membership user B)
+DELETE {{host}}/api/v1/rooms/{{room_id}}
+Authorization: Bearer {{access_token_a}}
+
+# Status 204
+
+### 12. User B пытается получить удалённую комнату → 403 ROOM-003
+GET {{host}}/api/v1/rooms/{{room_id}}
+Authorization: Bearer {{access_token_b}}
+
+# Status 403, body: {"error":{"code":"ROOM-003",...}}
+# (CASCADE снёс room_members → FindByPair вернул ErrNotMember до проверки rooms)

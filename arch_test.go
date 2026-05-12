@@ -16,6 +16,19 @@ const (
 	usecasePath = modulePath + "/internal/auth/usecase"
 	repoBase    = modulePath + "/internal/auth/repository"
 	transBase   = modulePath + "/internal/auth/transport"
+
+	roomDomainPath  = modulePath + "/internal/room/domain"
+	roomUsecasePath = modulePath + "/internal/room/usecase"
+	roomRepoBase    = modulePath + "/internal/room/repository"
+	roomTransBase   = modulePath + "/internal/room/transport"
+
+	channelDomainPath  = modulePath + "/internal/channel/domain"
+	channelUsecasePath = modulePath + "/internal/channel/usecase"
+	channelRepoBase    = modulePath + "/internal/channel/repository"
+	channelTransBase   = modulePath + "/internal/channel/transport"
+
+	authMiddlewarePath = modulePath + "/internal/auth/transport/http/middleware"
+	pkgHttpxPath       = modulePath + "/pkg/httpx"
 )
 
 // collectImports собирает все импорты из non-test go-файлов в директории.
@@ -196,6 +209,209 @@ func TestArchitecture_AuthMiddlewareImports(t *testing.T) {
 				t.Fatalf("%s imports adapter %q", file, im)
 			}
 			t.Fatalf("%s imports forbidden %q", file, im)
+		}
+	}
+}
+
+func TestArchitecture_RoomDomainImports(t *testing.T) {
+	t.Parallel()
+
+	allowed := map[string]struct{}{
+		"github.com/google/uuid": {},
+	}
+
+	imports := collectImports(t, "internal/room/domain")
+	for file, ims := range imports {
+		for _, im := range ims {
+			if isStdlib(im) {
+				continue
+			}
+			if _, ok := allowed[im]; ok {
+				continue
+			}
+			t.Fatalf("%s imports forbidden %q", file, im)
+		}
+	}
+}
+
+func TestArchitecture_RoomUseCaseImports(t *testing.T) {
+	t.Parallel()
+
+	allowed := map[string]struct{}{
+		"github.com/google/uuid": {},
+		roomDomainPath:           {},
+	}
+
+	imports := collectImports(t, "internal/room/usecase")
+	for file, ims := range imports {
+		for _, im := range ims {
+			if isStdlib(im) {
+				continue
+			}
+			if _, ok := allowed[im]; ok {
+				continue
+			}
+			t.Fatalf("%s imports forbidden %q", file, im)
+		}
+	}
+}
+
+// TestArchitecture_RoomRepoMayImplementChannelPort — room/repository/postgres
+// допустимо импортирует channel/usecase и channel/domain (для MembershipQueryAdapter),
+// но НЕ channel/transport и НЕ auth.
+func TestArchitecture_RoomRepoMayImplementChannelPort(t *testing.T) {
+	t.Parallel()
+
+	forbiddenPrefixes := []string{
+		modulePath + "/internal/channel/transport/",
+		modulePath + "/internal/auth/",
+	}
+
+	imports := collectImports(t, "internal/room/repository/postgres")
+	for file, ims := range imports {
+		for _, im := range ims {
+			for _, prefix := range forbiddenPrefixes {
+				if strings.HasPrefix(im, prefix) {
+					t.Fatalf("%s imports forbidden %q", file, im)
+				}
+			}
+		}
+	}
+}
+
+func TestArchitecture_RoomTransportImports(t *testing.T) {
+	t.Parallel()
+
+	allowed := map[string]struct{}{
+		"github.com/go-chi/chi/v5":            {},
+		"github.com/google/uuid":              {},
+		roomDomainPath:                        {},
+		roomUsecasePath:                       {},
+		authMiddlewarePath:                    {},
+		modulePath + "/internal/auth/usecase": {},
+		modulePath + "/internal/auth/domain":  {},
+		pkgHttpxPath:                          {},
+	}
+
+	imports := collectImports(t, "internal/room/transport/http")
+	for file, ims := range imports {
+		for _, im := range ims {
+			if isStdlib(im) {
+				continue
+			}
+			if _, ok := allowed[im]; ok {
+				continue
+			}
+			if strings.HasPrefix(im, roomRepoBase+"/") {
+				t.Fatalf("transport %s imports adapter %q", file, im)
+			}
+			if strings.HasPrefix(im, modulePath+"/internal/channel/") {
+				t.Fatalf("transport %s imports cross-domain %q", file, im)
+			}
+			t.Fatalf("transport %s imports forbidden %q", file, im)
+		}
+	}
+}
+
+func TestArchitecture_ChannelDomainImports(t *testing.T) {
+	t.Parallel()
+
+	allowed := map[string]struct{}{
+		"github.com/google/uuid": {},
+	}
+
+	imports := collectImports(t, "internal/channel/domain")
+	for file, ims := range imports {
+		for _, im := range ims {
+			if isStdlib(im) {
+				continue
+			}
+			if _, ok := allowed[im]; ok {
+				continue
+			}
+			t.Fatalf("%s imports forbidden %q", file, im)
+		}
+	}
+}
+
+// TestArchitecture_ChannelUseCaseImports — channel/usecase НЕ должен импортировать
+// room/* (связь только через порт MembershipQuery, реализуемый адаптером в room/repo).
+func TestArchitecture_ChannelUseCaseImports(t *testing.T) {
+	t.Parallel()
+
+	allowed := map[string]struct{}{
+		"github.com/google/uuid": {},
+		channelDomainPath:        {},
+	}
+
+	imports := collectImports(t, "internal/channel/usecase")
+	for file, ims := range imports {
+		for _, im := range ims {
+			if isStdlib(im) {
+				continue
+			}
+			if _, ok := allowed[im]; ok {
+				continue
+			}
+			if strings.HasPrefix(im, modulePath+"/internal/room/") {
+				t.Fatalf("channel/usecase %s imports room %q (must use port)", file, im)
+			}
+			t.Fatalf("%s imports forbidden %q", file, im)
+		}
+	}
+}
+
+func TestArchitecture_ChannelTransportImports(t *testing.T) {
+	t.Parallel()
+
+	allowed := map[string]struct{}{
+		"github.com/go-chi/chi/v5":            {},
+		"github.com/google/uuid":              {},
+		channelDomainPath:                     {},
+		channelUsecasePath:                    {},
+		authMiddlewarePath:                    {},
+		modulePath + "/internal/auth/usecase": {},
+		modulePath + "/internal/auth/domain":  {},
+		pkgHttpxPath:                          {},
+	}
+
+	imports := collectImports(t, "internal/channel/transport/http")
+	for file, ims := range imports {
+		for _, im := range ims {
+			if isStdlib(im) {
+				continue
+			}
+			if _, ok := allowed[im]; ok {
+				continue
+			}
+			if strings.HasPrefix(im, channelRepoBase+"/") {
+				t.Fatalf("transport %s imports adapter %q", file, im)
+			}
+			if strings.HasPrefix(im, modulePath+"/internal/room/") {
+				t.Fatalf("channel/transport %s imports room %q", file, im)
+			}
+			t.Fatalf("%s imports forbidden %q", file, im)
+		}
+	}
+}
+
+func TestArchitecture_ChannelRepoIsolated(t *testing.T) {
+	t.Parallel()
+
+	forbiddenPrefixes := []string{
+		modulePath + "/internal/room/",
+		modulePath + "/internal/auth/",
+		modulePath + "/internal/channel/transport/",
+	}
+
+	imports := collectImports(t, "internal/channel/repository/postgres")
+	for file, ims := range imports {
+		for _, im := range ims {
+			for _, prefix := range forbiddenPrefixes {
+				if strings.HasPrefix(im, prefix) {
+					t.Fatalf("%s imports forbidden %q", file, im)
+				}
+			}
 		}
 	}
 }

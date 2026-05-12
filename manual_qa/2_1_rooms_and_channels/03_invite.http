@@ -1,0 +1,29 @@
+@host = http://localhost:8080
+@access_token_owner = <user A — owner>
+@access_token_member = <user B — member>
+@room_id = <room id>
+
+### Owner выпускает invite → 200, code1
+POST {{host}}/api/v1/rooms/{{room_id}}/invite
+Authorization: Bearer {{access_token_owner}}
+
+# Status 200
+# Body: {"code":"XXXXXXXX","createdBy":"<uid>","createdAt":"..."}
+# Сохрани code как @code1.
+
+### Owner перевыпускает invite → 200, code2 (≠ code1)
+POST {{host}}/api/v1/rooms/{{room_id}}/invite
+Authorization: Bearer {{access_token_owner}}
+
+# Status 200
+# code2 в body — другой, чем code1.
+# В БД: старый invite revoked, новый active.
+
+### Member пытается выпустить invite → 403 ROOM-004
+POST {{host}}/api/v1/rooms/{{room_id}}/invite
+Authorization: Bearer {{access_token_member}}
+
+# Status 403
+# Body: {"error":{"code":"ROOM-004","message":"insufficient role: admin or owner required"}}
+
+### Использование code1 после перевыпуска → см. 04_join.http (ROOM-007)

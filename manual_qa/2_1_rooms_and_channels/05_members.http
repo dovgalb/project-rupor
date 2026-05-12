@@ -1,0 +1,18 @@
+@host = http://localhost:8080
+@access_token_a = <user A — owner>
+@access_token_outsider = <не в комнате>
+@room_id = <room с двумя members>
+
+### Member видит список → 200
+GET {{host}}/api/v1/rooms/{{room_id}}/members
+Authorization: Bearer {{access_token_a}}
+
+# Status 200
+# Body: {"items":[{"userId":"...","role":"owner","joinedAt":"..."},{"userId":"...","role":"member","joinedAt":"..."}]}
+
+### Outsider → 403 ROOM-003
+GET {{host}}/api/v1/rooms/{{room_id}}/members
+Authorization: Bearer {{access_token_outsider}}
+
+# Status 403
+# Body: {"error":{"code":"ROOM-003","message":"not a member"}}

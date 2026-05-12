@@ -1,0 +1,33 @@
+@host = http://localhost:8080
+@access_token_new = <свежий пользователь, не в комнате>
+@access_token_member = <уже в комнате>
+@invite_code = <актуальный активный код из 03_invite.http>
+@revoked_code = <старый отозванный код>
+
+### Happy path — новый пользователь по активному коду → 200
+POST {{host}}/api/v1/rooms/join/{{invite_code}}
+Authorization: Bearer {{access_token_new}}
+
+# Status 200
+# Body: roomResponse (комната, в которую вошёл)
+
+### Уже member → 409 ROOM-006
+POST {{host}}/api/v1/rooms/join/{{invite_code}}
+Authorization: Bearer {{access_token_member}}
+
+# Status 409
+# Body: {"error":{"code":"ROOM-006","message":"already a member"}}
+
+### Битый формат кода (длина < 8) → 400 ROOM-008
+POST {{host}}/api/v1/rooms/join/ABC
+Authorization: Bearer {{access_token_new}}
+
+# Status 400
+# Body: {"error":{"code":"ROOM-008","message":"invalid invite code"}}
+
+### Отозванный код → 404 ROOM-007
+POST {{host}}/api/v1/rooms/join/{{revoked_code}}
+Authorization: Bearer {{access_token_new}}
+
+# Status 404
+# Body: {"error":{"code":"ROOM-007","message":"invite not found or revoked"}}

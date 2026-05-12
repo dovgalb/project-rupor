@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	cryptorand "crypto/rand"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -25,6 +26,12 @@ import (
 	httpauth "github.com/dovgalb/project-rupor/internal/auth/transport/http"
 	authmw "github.com/dovgalb/project-rupor/internal/auth/transport/http/middleware"
 	"github.com/dovgalb/project-rupor/internal/auth/usecase"
+	channelpg "github.com/dovgalb/project-rupor/internal/channel/repository/postgres"
+	httpchannel "github.com/dovgalb/project-rupor/internal/channel/transport/http"
+	channelusecase "github.com/dovgalb/project-rupor/internal/channel/usecase"
+	roompg "github.com/dovgalb/project-rupor/internal/room/repository/postgres"
+	httproom "github.com/dovgalb/project-rupor/internal/room/transport/http"
+	roomusecase "github.com/dovgalb/project-rupor/internal/room/usecase"
 	httpxmw "github.com/dovgalb/project-rupor/pkg/httpx/middleware"
 )
 
@@ -100,6 +107,28 @@ func run(cfg *config.Config, logger *slog.Logger) error {
 	)
 	meUC := usecase.NewGetCurrentUser(userRepo)
 
+	// === Room composition ===
+	roomRepo := roompg.NewRoomRepository(pool)
+	membershipRepo := roompg.NewMembershipRepository(pool)
+	inviteRepo := roompg.NewInviteRepository(pool)
+	inviteCodeGen := roompg.NewBase32CodeGen(cryptorand.Reader)
+
+	createRoomUC := roomusecase.NewCreateRoom(roomRepo, clock, uuids)
+	getRoomUC := roomusecase.NewGetRoom(roomRepo, membershipRepo)
+	listRoomsUC := roomusecase.NewListUserRooms(roomRepo)
+	deleteRoomUC := roomusecase.NewDeleteRoom(roomRepo, membershipRepo)
+	listMembersUC := roomusecase.NewListMembers(membershipRepo)
+	regenInviteUC := roomusecase.NewRegenerateInvite(inviteRepo, membershipRepo, inviteCodeGen, clock, uuids)
+	joinByCodeUC := roomusecase.NewJoinByCode(inviteRepo, membershipRepo, roomRepo, clock)
+
+	// === Channel composition ===
+	channelRepo := channelpg.NewChannelRepository(pool)
+	membershipQuery := roompg.NewMembershipQueryAdapter(pool)
+
+	createChannelUC := channelusecase.NewCreateChannel(channelRepo, membershipQuery, clock, uuids)
+	listChannelsUC := channelusecase.NewListChannels(channelRepo, membershipQuery)
+	deleteChannelUC := channelusecase.NewDeleteChannel(channelRepo, membershipQuery)
+
 	mux := chi.NewRouter()
 
 	uuidGen := func() string { return uuid.New().String() }
@@ -125,6 +154,24 @@ func run(cfg *config.Config, logger *slog.Logger) error {
 			Me:          meUC,
 			TokenIssuer: issuer,
 			Clock:       clock,
+		})
+		httproom.RegisterRoutes(r, httproom.Deps{
+			CreateRoom:       createRoomUC,
+			GetRoom:          getRoomUC,
+			ListUserRooms:    listRoomsUC,
+			DeleteRoom:       deleteRoomUC,
+			ListMembers:      listMembersUC,
+			RegenerateInvite: regenInviteUC,
+			JoinByCode:       joinByCodeUC,
+			TokenIssuer:      issuer,
+			Clock:            clock,
+		})
+		httpchannel.RegisterRoutes(r, httpchannel.Deps{
+			CreateChannel: createChannelUC,
+			ListChannels:  listChannelsUC,
+			DeleteChannel: deleteChannelUC,
+			TokenIssuer:   issuer,
+			Clock:         clock,
 		})
 	})
 

@@ -1,0 +1,47 @@
+@host = http://localhost:8080
+@access_token = <access_token user A из 00_flow.http>
+
+### Happy path → 201
+POST {{host}}/api/v1/rooms
+Authorization: Bearer {{access_token}}
+Content-Type: application/json
+
+{
+  "name": "general"
+}
+
+# Status 201
+# Body: {"id":"<uuid>","ownerId":"<uid>","name":"general","createdAt":"..."}
+
+### Без токена → 401 AUTH-010
+POST {{host}}/api/v1/rooms
+Content-Type: application/json
+
+{
+  "name": "general"
+}
+
+# Status 401
+# Body: {"error":{"code":"AUTH-010","message":"access token invalid"}}
+
+### Пустое name → 400 ROOM-001
+POST {{host}}/api/v1/rooms
+Authorization: Bearer {{access_token}}
+Content-Type: application/json
+
+{
+  "name": ""
+}
+
+# Status 400
+# Body: {"error":{"code":"ROOM-001","message":"invalid room name"}}
+
+### Битый JSON → 400 ROOM-009
+POST {{host}}/api/v1/rooms
+Authorization: Bearer {{access_token}}
+Content-Type: application/json
+
+{not json}
+
+# Status 400
+# Body: {"error":{"code":"ROOM-009","message":"invalid request body"}}
