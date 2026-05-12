@@ -29,10 +29,15 @@ import (
 	channelpg "github.com/dovgalb/project-rupor/internal/channel/repository/postgres"
 	httpchannel "github.com/dovgalb/project-rupor/internal/channel/transport/http"
 	channelusecase "github.com/dovgalb/project-rupor/internal/channel/usecase"
+	chatpg "github.com/dovgalb/project-rupor/internal/chat/repository/postgres"
+	httpchat "github.com/dovgalb/project-rupor/internal/chat/transport/http"
+	wschat "github.com/dovgalb/project-rupor/internal/chat/transport/ws"
+	chatusecase "github.com/dovgalb/project-rupor/internal/chat/usecase"
 	roompg "github.com/dovgalb/project-rupor/internal/room/repository/postgres"
 	httproom "github.com/dovgalb/project-rupor/internal/room/transport/http"
 	roomusecase "github.com/dovgalb/project-rupor/internal/room/usecase"
 	httpxmw "github.com/dovgalb/project-rupor/pkg/httpx/middleware"
+	pws "github.com/dovgalb/project-rupor/pkg/websocket"
 )
 
 const (
@@ -119,7 +124,6 @@ func run(cfg *config.Config, logger *slog.Logger) error {
 	deleteRoomUC := roomusecase.NewDeleteRoom(roomRepo, membershipRepo)
 	listMembersUC := roomusecase.NewListMembers(membershipRepo)
 	regenInviteUC := roomusecase.NewRegenerateInvite(inviteRepo, membershipRepo, inviteCodeGen, clock, uuids)
-	joinByCodeUC := roomusecase.NewJoinByCode(inviteRepo, membershipRepo, roomRepo, clock)
 
 	// === Channel composition ===
 	channelRepo := channelpg.NewChannelRepository(pool)
@@ -128,6 +132,21 @@ func run(cfg *config.Config, logger *slog.Logger) error {
 	createChannelUC := channelusecase.NewCreateChannel(channelRepo, membershipQuery, clock, uuids)
 	listChannelsUC := channelusecase.NewListChannels(channelRepo, membershipQuery)
 	deleteChannelUC := channelusecase.NewDeleteChannel(channelRepo, membershipQuery)
+
+	// === WebSocket Hub ===
+	hub := pws.NewHub(logger)
+
+	// === Chat composition ===
+	messageRepo := chatpg.NewMessageRepository(pool)
+	membershipForChat := roompg.NewMembershipQueryChatAdapter(pool)
+	chatBroadcaster := newHubChatBroadcaster(hub)
+	roomEventsPublisher := newHubRoomEventsPublisher(hub)
+
+	sendMessageUC := chatusecase.NewSendMessage(messageRepo, membershipForChat, chatBroadcaster, clock, uuids)
+	listMessagesUC := chatusecase.NewListMessages(messageRepo, membershipForChat)
+
+	// joinByCodeUC использует publisher; объявлен после hub.
+	joinByCodeUC := roomusecase.NewJoinByCode(inviteRepo, membershipRepo, roomRepo, clock, roomEventsPublisher)
 
 	mux := chi.NewRouter()
 
@@ -173,6 +192,20 @@ func run(cfg *config.Config, logger *slog.Logger) error {
 			TokenIssuer:   issuer,
 			Clock:         clock,
 		})
+		httpchat.RegisterRoutes(r, httpchat.Deps{
+			ListMessages: listMessagesUC,
+			TokenIssuer:  issuer,
+			Clock:        clock,
+		})
+		wschat.RegisterWSRoute(r, wschat.WSDeps{
+			Hub:                hub,
+			SendMessage:        sendMessageUC,
+			MembershipForChat:  membershipForChat,
+			MembershipForRooms: roomIDsAdapter{repo: roomRepo},
+			TokenIssuer:        issuer,
+			Clock:              clock,
+			OriginPatterns:     stripScheme(cfg.CORSAllowedOrigins()),
+		})
 	})
 
 	addr := ":" + strconv.Itoa(cfg.ServerPort())
@@ -205,6 +238,10 @@ func run(cfg *config.Config, logger *slog.Logger) error {
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
+
+	// Hub.Shutdown ДО srv.Shutdown — клиенты должны получить close-frame 1001
+	// до того, как HTTP-сервер прекратит ответ.
+	hub.Shutdown(shutdownCtx)
 
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		return err

@@ -341,7 +341,7 @@ func setupServer(t *testing.T) *testEnv {
 	deleteRoom := usecase.NewDeleteRoom(rooms, memberships)
 	listMembers := usecase.NewListMembers(memberships)
 	regenInvite := usecase.NewRegenerateInvite(invites, memberships, codes, clock, uuids)
-	joinByCode := usecase.NewJoinByCode(invites, memberships, rooms, clock)
+	joinByCode := usecase.NewJoinByCode(invites, memberships, rooms, clock, noopRoomEventsPublisher{})
 
 	r := chi.NewRouter()
 	httproom.RegisterRoutes(r, httproom.Deps{
@@ -388,4 +388,12 @@ type errResp struct {
 		Code    string `json:"code"`
 		Message string `json:"message"`
 	} `json:"error"`
+}
+
+// noopRoomEventsPublisher — заглушка publisher'а для HTTP-тестов room.
+// Тесты room-handler'ов не проверяют публикацию member.joined — для этого
+// есть юнит-тесты JoinByCode.
+type noopRoomEventsPublisher struct{}
+
+func (noopRoomEventsPublisher) PublishMemberJoined(_ domain.RoomID, _ domain.UserID, _ time.Time) {
 }

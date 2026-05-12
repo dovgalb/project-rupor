@@ -27,8 +27,12 @@ const (
 	channelRepoBase    = modulePath + "/internal/channel/repository"
 	channelTransBase   = modulePath + "/internal/channel/transport"
 
+	chatDomainPath  = modulePath + "/internal/chat/domain"
+	chatUsecasePath = modulePath + "/internal/chat/usecase"
+
 	authMiddlewarePath = modulePath + "/internal/auth/transport/http/middleware"
 	pkgHttpxPath       = modulePath + "/pkg/httpx"
+	pkgWebsocketPath   = modulePath + "/pkg/websocket"
 )
 
 // collectImports собирает все импорты из non-test go-файлов в директории.
@@ -411,6 +415,158 @@ func TestArchitecture_ChannelRepoIsolated(t *testing.T) {
 				if strings.HasPrefix(im, prefix) {
 					t.Fatalf("%s imports forbidden %q", file, im)
 				}
+			}
+		}
+	}
+}
+
+// === Chat / pkg/websocket arch tests (PR-3.1) ===
+
+func TestArchitecture_ChatDomainImports(t *testing.T) {
+	t.Parallel()
+
+	allowed := map[string]struct{}{
+		"github.com/google/uuid": {},
+	}
+
+	imports := collectImports(t, "internal/chat/domain")
+	for file, ims := range imports {
+		for _, im := range ims {
+			if isStdlib(im) {
+				continue
+			}
+			if _, ok := allowed[im]; ok {
+				continue
+			}
+			t.Fatalf("%s imports forbidden %q", file, im)
+		}
+	}
+}
+
+func TestArchitecture_ChatUseCaseImports(t *testing.T) {
+	t.Parallel()
+
+	allowed := map[string]struct{}{
+		"github.com/google/uuid": {},
+		chatDomainPath:           {},
+	}
+
+	imports := collectImports(t, "internal/chat/usecase")
+	for file, ims := range imports {
+		for _, im := range ims {
+			if isStdlib(im) {
+				continue
+			}
+			if _, ok := allowed[im]; ok {
+				continue
+			}
+			t.Fatalf("%s imports forbidden %q", file, im)
+		}
+	}
+}
+
+// TestArchitecture_ChatRepoIsolated — chat/repository/postgres не должен
+// импортировать чужие домены (room, channel, auth) или собственный transport.
+func TestArchitecture_ChatRepoIsolated(t *testing.T) {
+	t.Parallel()
+
+	forbiddenPrefixes := []string{
+		modulePath + "/internal/room/",
+		modulePath + "/internal/channel/",
+		modulePath + "/internal/auth/",
+		modulePath + "/internal/chat/transport/",
+	}
+
+	imports := collectImports(t, "internal/chat/repository/postgres")
+	for file, ims := range imports {
+		for _, im := range ims {
+			for _, prefix := range forbiddenPrefixes {
+				if strings.HasPrefix(im, prefix) {
+					t.Fatalf("%s imports forbidden %q", file, im)
+				}
+			}
+		}
+	}
+}
+
+func TestArchitecture_ChatTransportHTTPImports(t *testing.T) {
+	t.Parallel()
+
+	allowed := map[string]struct{}{
+		"github.com/go-chi/chi/v5":            {},
+		"github.com/google/uuid":              {},
+		chatDomainPath:                        {},
+		chatUsecasePath:                       {},
+		authMiddlewarePath:                    {},
+		modulePath + "/internal/auth/usecase": {},
+		modulePath + "/internal/auth/domain":  {},
+		pkgHttpxPath:                          {},
+	}
+
+	imports := collectImports(t, "internal/chat/transport/http")
+	for file, ims := range imports {
+		for _, im := range ims {
+			if isStdlib(im) {
+				continue
+			}
+			if _, ok := allowed[im]; ok {
+				continue
+			}
+			if strings.HasPrefix(im, modulePath+"/internal/room/") ||
+				strings.HasPrefix(im, modulePath+"/internal/channel/") {
+				t.Fatalf("chat/transport/http %s imports cross-domain %q", file, im)
+			}
+			t.Fatalf("chat/transport/http %s imports forbidden %q", file, im)
+		}
+	}
+}
+
+func TestArchitecture_ChatTransportWSImports(t *testing.T) {
+	t.Parallel()
+
+	allowed := map[string]struct{}{
+		"github.com/go-chi/chi/v5":            {},
+		"github.com/google/uuid":              {},
+		chatDomainPath:                        {},
+		chatUsecasePath:                       {},
+		authMiddlewarePath:                    {},
+		modulePath + "/internal/auth/usecase": {},
+		modulePath + "/internal/auth/domain":  {},
+		pkgHttpxPath:                          {},
+		pkgWebsocketPath:                      {},
+		"github.com/coder/websocket":          {},
+	}
+
+	imports := collectImports(t, "internal/chat/transport/ws")
+	for file, ims := range imports {
+		for _, im := range ims {
+			if isStdlib(im) {
+				continue
+			}
+			if _, ok := allowed[im]; ok {
+				continue
+			}
+			if strings.HasPrefix(im, modulePath+"/internal/room/") ||
+				strings.HasPrefix(im, modulePath+"/internal/channel/") {
+				t.Fatalf("chat/transport/ws %s imports cross-domain %q", file, im)
+			}
+			t.Fatalf("chat/transport/ws %s imports forbidden %q", file, im)
+		}
+	}
+}
+
+// TestArchitecture_PkgWebsocketIsolated — pkg/websocket НИ ОДНОГО internal/*
+// импорта (domain-агностичный пакет).
+func TestArchitecture_PkgWebsocketIsolated(t *testing.T) {
+	t.Parallel()
+
+	forbiddenPrefix := modulePath + "/internal/"
+
+	imports := collectImports(t, "pkg/websocket")
+	for file, ims := range imports {
+		for _, im := range ims {
+			if strings.HasPrefix(im, forbiddenPrefix) {
+				t.Fatalf("pkg/websocket %s imports forbidden %q", file, im)
 			}
 		}
 	}

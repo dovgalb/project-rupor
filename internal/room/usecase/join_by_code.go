@@ -23,6 +23,7 @@ type JoinByCode struct {
 	memberships MembershipRepository
 	rooms       RoomRepository
 	clock       Clock
+	events      RoomEventsPublisher
 }
 
 func NewJoinByCode(
@@ -30,8 +31,15 @@ func NewJoinByCode(
 	memberships MembershipRepository,
 	rooms RoomRepository,
 	clock Clock,
+	events RoomEventsPublisher,
 ) *JoinByCode {
-	return &JoinByCode{invites: invites, memberships: memberships, rooms: rooms, clock: clock}
+	return &JoinByCode{
+		invites:     invites,
+		memberships: memberships,
+		rooms:       rooms,
+		clock:       clock,
+		events:      events,
+	}
 }
 
 func (uc *JoinByCode) Execute(ctx context.Context, in JoinByCodeInput) (JoinByCodeOutput, error) {
@@ -62,6 +70,11 @@ func (uc *JoinByCode) Execute(ctx context.Context, in JoinByCodeInput) (JoinByCo
 	if addErr := uc.memberships.Add(ctx, m); addErr != nil {
 		return JoinByCodeOutput{}, addErr
 	}
+	// Best-effort publish: panic/error в publisher'е не должны откатить join.
+	func() {
+		defer func() { _ = recover() }()
+		uc.events.PublishMemberJoined(invite.RoomID(), actorID, m.JoinedAt())
+	}()
 	room, err := uc.rooms.FindByID(ctx, invite.RoomID())
 	if err != nil {
 		return JoinByCodeOutput{}, err

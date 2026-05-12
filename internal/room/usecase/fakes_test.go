@@ -2,6 +2,7 @@ package usecase_test
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -316,4 +317,40 @@ func (r *fakeInviteRepo) FindActiveByCode(_ context.Context, code domain.InviteC
 
 func (r *fakeInviteRepo) put(inv *domain.Invite) {
 	r.byID[inv.ID().UUID()] = inv
+}
+
+// ---------- fakeRoomEventsPublisher ----------
+
+type memberJoinedCall struct {
+	RoomID   domain.RoomID
+	UserID   domain.UserID
+	JoinedAt time.Time
+}
+
+type fakeRoomEventsPublisher struct {
+	mu           sync.Mutex
+	memberJoined []memberJoinedCall
+	panicNext    bool
+}
+
+func newFakeRoomEventsPublisher() *fakeRoomEventsPublisher {
+	return &fakeRoomEventsPublisher{}
+}
+
+func (p *fakeRoomEventsPublisher) PublishMemberJoined(roomID domain.RoomID, userID domain.UserID, joinedAt time.Time) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.panicNext {
+		p.panicNext = false
+		panic("simulated publisher panic")
+	}
+	p.memberJoined = append(p.memberJoined, memberJoinedCall{RoomID: roomID, UserID: userID, JoinedAt: joinedAt})
+}
+
+func (p *fakeRoomEventsPublisher) calls() []memberJoinedCall {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	out := make([]memberJoinedCall, len(p.memberJoined))
+	copy(out, p.memberJoined)
+	return out
 }

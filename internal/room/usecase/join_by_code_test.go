@@ -18,6 +18,7 @@ type joinByCodeSUT struct {
 	memberships *fakeMembershipRepo
 	rooms       *fakeRoomRepo
 	clock       *fixedClock
+	events      *fakeRoomEventsPublisher
 	now         time.Time
 }
 
@@ -28,12 +29,14 @@ func newJoinByCodeSUT(t *testing.T) *joinByCodeSUT {
 	memberships := newFakeMembershipRepo()
 	rooms := newFakeRoomRepo()
 	clock := &fixedClock{now: now}
+	events := newFakeRoomEventsPublisher()
 	return &joinByCodeSUT{
-		uc:          usecase.NewJoinByCode(invites, memberships, rooms, clock),
+		uc:          usecase.NewJoinByCode(invites, memberships, rooms, clock, events),
 		invites:     invites,
 		memberships: memberships,
 		rooms:       rooms,
 		clock:       clock,
+		events:      events,
 		now:         now,
 	}
 }
@@ -129,5 +132,77 @@ func TestJoinByCode_RaceWithDuplicateInsert_ReturnsErrAlreadyMember(t *testing.T
 	})
 	if !errors.Is(err, domain.ErrAlreadyMember) {
 		t.Fatalf("got %v, want ErrAlreadyMember", err)
+	}
+}
+
+func TestJoinByCode_Success_PublishesMemberJoined(t *testing.T) {
+	t.Parallel()
+
+	sut := newJoinByCodeSUT(t)
+	actor := uuid.New()
+	owner := uuid.New()
+	roomUUID := uuid.New()
+	sut.rooms.rooms[roomUUID] = mustRoom(t, roomUUID, owner, "r", sut.now)
+	sut.invites.put(mustInvite(t, uuid.New(), roomUUID, "ABCDEFGH", owner, sut.now))
+
+	_, err := sut.uc.Execute(context.Background(), usecase.JoinByCodeInput{
+		ActorID: actor,
+		Code:    "ABCDEFGH",
+	})
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	calls := sut.events.calls()
+	if len(calls) != 1 {
+		t.Fatalf("publisher calls = %d, want 1", len(calls))
+	}
+	if calls[0].RoomID.UUID() != roomUUID {
+		t.Fatalf("publish RoomID = %v, want %v", calls[0].RoomID, roomUUID)
+	}
+	if calls[0].UserID.UUID() != actor {
+		t.Fatalf("publish UserID = %v, want %v", calls[0].UserID, actor)
+	}
+	if !calls[0].JoinedAt.Equal(sut.now) {
+		t.Fatalf("publish JoinedAt = %v, want %v", calls[0].JoinedAt, sut.now)
+	}
+}
+
+func TestJoinByCode_PublishPanic_DoesNotRollbackMembership(t *testing.T) {
+	t.Parallel()
+
+	sut := newJoinByCodeSUT(t)
+	sut.events.panicNext = true
+	actor := uuid.New()
+	owner := uuid.New()
+	roomUUID := uuid.New()
+	sut.rooms.rooms[roomUUID] = mustRoom(t, roomUUID, owner, "r", sut.now)
+	sut.invites.put(mustInvite(t, uuid.New(), roomUUID, "ABCDEFGH", owner, sut.now))
+
+	_, err := sut.uc.Execute(context.Background(), usecase.JoinByCodeInput{
+		ActorID: actor,
+		Code:    "ABCDEFGH",
+	})
+	if err != nil {
+		t.Fatalf("Execute: %v (panic в publisher должна быть проглочена)", err)
+	}
+	if len(sut.memberships.added) != 1 {
+		t.Fatalf("memberships.added = %d, want 1 (rollback не должен произойти)", len(sut.memberships.added))
+	}
+}
+
+func TestJoinByCode_InvalidCode_DoesNotPublish(t *testing.T) {
+	t.Parallel()
+
+	sut := newJoinByCodeSUT(t)
+
+	_, err := sut.uc.Execute(context.Background(), usecase.JoinByCodeInput{
+		ActorID: uuid.New(),
+		Code:    "ABCDEFGH", // валидный формат, но в fake-репо такого invite'а нет
+	})
+	if !errors.Is(err, domain.ErrInviteNotFound) {
+		t.Fatalf("got %v, want ErrInviteNotFound", err)
+	}
+	if len(sut.events.calls()) != 0 {
+		t.Fatalf("publisher вызван при ошибке Find")
 	}
 }

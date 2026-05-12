@@ -1,0 +1,43 @@
+@host = http://localhost:8080
+@access_token = <access token участника канала>
+@channel_id = <uuid text-канала>
+
+### Happy: пагинация, default limit=50
+GET {{host}}/api/v1/channels/{{channel_id}}/messages
+Authorization: Bearer {{access_token}}
+
+### Happy: явный limit
+GET {{host}}/api/v1/channels/{{channel_id}}/messages?limit=10
+Authorization: Bearer {{access_token}}
+
+### Happy: курсорная пагинация
+# Получи nextBefore из предыдущего ответа и подставь сюда.
+GET {{host}}/api/v1/channels/{{channel_id}}/messages?limit=10&before=<nextBefore>
+Authorization: Bearer {{access_token}}
+
+### 401 AUTH-010: без токена
+GET {{host}}/api/v1/channels/{{channel_id}}/messages
+
+### 400 CHAT-005: невалидный channel_id
+GET {{host}}/api/v1/channels/bad-uuid/messages
+Authorization: Bearer {{access_token}}
+
+### 400 CHAT-005: невалидный before
+GET {{host}}/api/v1/channels/{{channel_id}}/messages?before=bad
+Authorization: Bearer {{access_token}}
+
+### 400 CHAT-006: limit < 1
+GET {{host}}/api/v1/channels/{{channel_id}}/messages?limit=0
+Authorization: Bearer {{access_token}}
+
+### 400 CHAT-006: limit > 100
+GET {{host}}/api/v1/channels/{{channel_id}}/messages?limit=101
+Authorization: Bearer {{access_token}}
+
+### 403 CHAT-004: пользователь не член комнаты (взять токен НЕ-члена)
+GET {{host}}/api/v1/channels/{{channel_id}}/messages
+Authorization: Bearer <token-не-члена>
+
+### 404 CHAT-002: канал не существует
+GET {{host}}/api/v1/channels/00000000-0000-4000-8000-000000000000/messages
+Authorization: Bearer {{access_token}}

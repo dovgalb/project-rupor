@@ -146,3 +146,28 @@ func TestLogger_DoesNotLogBody(t *testing.T) {
 		t.Fatalf("лог содержит body, buf=%s", buf.String())
 	}
 }
+
+func TestLogger_StripsTokenFromAccessLog(t *testing.T) {
+	t.Parallel()
+
+	logger, buf := newTestLogger()
+	mw := httpxmw.Logger(logger, nil)
+	h := mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/ws?token=secret123&channel_id=abc", nil)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	out := buf.String()
+	if strings.Contains(out, "secret123") {
+		t.Fatalf("token утёк в лог: %s", out)
+	}
+	if !strings.Contains(out, "REDACTED") {
+		t.Fatalf("ожидали REDACTED-маркер: %s", out)
+	}
+	if !strings.Contains(out, "channel_id=abc") {
+		t.Fatalf("остальные параметры должны остаться: %s", out)
+	}
+}

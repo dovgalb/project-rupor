@@ -1,0 +1,105 @@
+@host = http://localhost:8080
+@access_token_a = <получи из шага login user A ниже>
+@access_token_b = <получи из шага login user B ниже>
+@room_id = <получи из шага create room ниже>
+@invite_code = <получи из шага invite ниже>
+@channel_id = <получи из шага create channel ниже>
+
+# Happy-path сценарий для PR-3.1 realtime chat.
+# Прерхрек:
+#   1. Поднята БД (make dc-up), миграции применены (make migrate-up).
+#   2. Сервер запущен (make run).
+#   3. Бери токены и id-шники из ответов и подставляй в переменные выше.
+
+### 1. Register user A (Alice)
+POST {{host}}/api/v1/auth/register
+Content-Type: application/json
+
+{
+  "email": "alice-chat@example.com",
+  "username": "alice_chat",
+  "password": "correct-pass-123"
+}
+
+### 2. Register user B (Bob)
+POST {{host}}/api/v1/auth/register
+Content-Type: application/json
+
+{
+  "email": "bob-chat@example.com",
+  "username": "bob_chat",
+  "password": "correct-pass-123"
+}
+
+### 3. Login Alice → @access_token_a
+POST {{host}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "alice-chat@example.com",
+  "password": "correct-pass-123"
+}
+
+### 4. Login Bob → @access_token_b
+POST {{host}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "bob-chat@example.com",
+  "password": "correct-pass-123"
+}
+
+### 5. Alice создаёт комнату → @room_id
+POST {{host}}/api/v1/rooms
+Authorization: Bearer {{access_token_a}}
+Content-Type: application/json
+
+{
+  "name": "chat-test-room"
+}
+
+### 6. Alice создаёт text-канал → @channel_id
+POST {{host}}/api/v1/rooms/{{room_id}}/channels
+Authorization: Bearer {{access_token_a}}
+Content-Type: application/json
+
+{
+  "name": "general",
+  "kind": "text"
+}
+
+### 7. Alice генерирует invite → @invite_code
+POST {{host}}/api/v1/rooms/{{room_id}}/invite
+Authorization: Bearer {{access_token_a}}
+
+### 8. Bob джоинится по invite
+POST {{host}}/api/v1/rooms/join
+Authorization: Bearer {{access_token_b}}
+Content-Type: application/json
+
+{
+  "code": "{{invite_code}}"
+}
+
+# Ожидаемый результат: 200 OK. Если Alice была в этот момент подключена через WS,
+# она получила событие `member.joined` в room-topic.
+
+### 9. Empty history: ожидаем пустой список и nextBefore=null
+GET {{host}}/api/v1/channels/{{channel_id}}/messages?limit=10
+Authorization: Bearer {{access_token_a}}
+
+# Ожидаемый ответ: {"items":[],"nextBefore":null}
+
+### 10. См. файл 02_ws_browser_test.md для отправки сообщений через WebSocket.
+### После отправки нескольких сообщений можно проверить историю:
+GET {{host}}/api/v1/channels/{{channel_id}}/messages?limit=10
+Authorization: Bearer {{access_token_a}}
+
+# Ожидаемый ответ:
+# {
+#   "items": [
+#     {"id":"...","channelId":"...","authorId":"...","text":"hello","createdAt":"..."},
+#     ...
+#   ],
+#   "nextBefore": "<uuid>" если len(items) == limit, иначе null
+# }

@@ -125,29 +125,29 @@ WS     /api/v1/ws?token=<jwt>
 ---
 
 ## Фаза 2 — Комнаты и каналы
-- [ ] Миграции: `rooms`, `room_members` (с ролями owner/admin/member), `invites`, `channels` (тип text/voice)
-- [ ] Домен `room`: сущности, роли, инварианты прав
-- [ ] Usecase: создать/получить/удалить комнату, список комнат пользователя
-- [ ] Usecase: генерация инвайта, вступление по коду
-- [ ] Usecase: список участников
-- [ ] Домен `channel`: CRUD каналов внутри комнаты, проверка прав
-- [ ] HTTP: `POST/GET/DELETE /rooms`, `/rooms/:id/invite`, `/rooms/join/:code`, `/rooms/:id/members`
-- [ ] HTTP: `POST/GET/DELETE /rooms/:id/channels`
-- [ ] Репозитории postgres (sqlc) для room/channel
-- [ ] Тесты
+- [x] Миграции: `rooms`, `room_members` (с ролями owner/admin/member), `invites`, `channels` (тип text/voice)
+- [x] Домен `room`: сущности, роли, инварианты прав
+- [x] Usecase: создать/получить/удалить комнату, список комнат пользователя
+- [x] Usecase: генерация инвайта, вступление по коду
+- [x] Usecase: список участников
+- [x] Домен `channel`: CRUD каналов внутри комнаты, проверка прав
+- [x] HTTP: `POST/GET/DELETE /rooms`, `/rooms/:id/invite`, `/rooms/join/:code`, `/rooms/:id/members`
+- [x] HTTP: `POST/GET/DELETE /rooms/:id/channels`
+- [x] Репозитории postgres (sqlc) для room/channel
+- [x] Тесты
 
 ---
 
 ## Фаза 3 — Текстовый чат (реалтайм)
-- [ ] Миграция: `messages` (id, channel_id, author_id, text, created_at) + индексы
-- [ ] `pkg/websocket/`: hub, регистрация подключений, подписка на каналы, broadcast
-- [ ] WebSocket-эндпоинт `/api/v1/ws?token=<jwt>` с авторизацией по JWT
-- [ ] Обработчики событий: `subscribe`, `message.send`, `message.new`, `member.joined`
-- [ ] Домен `chat`: сущности, usecase отправки/чтения сообщений
-- [ ] Сохранение сообщений в БД (sqlc)
-- [ ] REST `GET /channels/:id/messages?before=&limit=` (курсорная пагинация)
-- [ ] Проверка прав (только член комнаты может писать/читать)
-- [ ] Тесты hub'а и usecase
+- [x] Миграция: `messages` (id, channel_id, author_id, text, created_at) + индексы
+- [x] `pkg/websocket/`: hub, регистрация подключений, подписка на каналы, broadcast
+- [x] WebSocket-эндпоинт `/api/v1/ws?token=<jwt>` с авторизацией по JWT
+- [x] Обработчики событий: `subscribe`, `message.send`, `message.new`, `member.joined`
+- [x] Домен `chat`: сущности, usecase отправки/чтения сообщений
+- [x] Сохранение сообщений в БД (sqlc)
+- [x] REST `GET /channels/:id/messages?before=&limit=` (курсорная пагинация)
+- [x] Проверка прав (только член комнаты может писать/читать)
+- [x] Тесты hub'а и usecase
 
 ---
 

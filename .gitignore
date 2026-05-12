@@ -30,3 +30,6 @@ Thumbs.db
 
 # local_tasks
 /tasks
+
+# Stray top-level server binary (from accidental 'go build ./cmd/server' without -o)
+/server

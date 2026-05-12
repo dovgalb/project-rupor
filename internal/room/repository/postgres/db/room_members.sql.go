@@ -12,6 +12,17 @@ import (
 	"github.com/google/uuid"
 )
 
+const channelExists = `-- name: ChannelExists :one
+SELECT EXISTS(SELECT 1 FROM channels WHERE id = $1) AS exists
+`
+
+func (q *Queries) ChannelExists(ctx context.Context, id uuid.UUID) (bool, error) {
+	row := q.db.QueryRow(ctx, channelExists, id)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const deleteRoomMember = `-- name: DeleteRoomMember :execrows
 DELETE FROM room_members
 WHERE room_id = $1 AND user_id = $2
@@ -28,6 +39,25 @@ func (q *Queries) DeleteRoomMember(ctx context.Context, arg DeleteRoomMemberPara
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const getMemberForChannel = `-- name: GetMemberForChannel :one
+SELECT rm.role
+FROM channels AS c
+JOIN room_members AS rm ON rm.room_id = c.room_id
+WHERE c.id = $1 AND rm.user_id = $2
+`
+
+type GetMemberForChannelParams struct {
+	ID     uuid.UUID
+	UserID uuid.UUID
+}
+
+func (q *Queries) GetMemberForChannel(ctx context.Context, arg GetMemberForChannelParams) (string, error) {
+	row := q.db.QueryRow(ctx, getMemberForChannel, arg.ID, arg.UserID)
+	var role string
+	err := row.Scan(&role)
+	return role, err
 }
 
 const getRoomMember = `-- name: GetRoomMember :one

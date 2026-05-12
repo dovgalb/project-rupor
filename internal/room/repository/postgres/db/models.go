@@ -28,6 +28,14 @@ type Invite struct {
 	RevokedAt pgtype.Timestamptz
 }
 
+type Message struct {
+	ID        uuid.UUID
+	ChannelID uuid.UUID
+	AuthorID  uuid.UUID
+	Text      string
+	CreatedAt time.Time
+}
+
 type RefreshToken struct {
 	ID        uuid.UUID
 	UserID    uuid.UUID
