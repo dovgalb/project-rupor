@@ -2,9 +2,39 @@
 
 **Prerequisite:** сервер запущен (`make run`), есть валидный access token и channel_id из 00_flow.http.
 
+## ⚠️ Важно про CSP
+
+Не открывай DevTools на сайте с жёсткой Content-Security-Policy (reddit, github, gmail и т.п.) — `connect-src` запретит `ws://localhost`. Используй вариант БЕЗ CSP:
+
+- **Готовая страничка:** открой `manual_qa/3_1_realtime_chat/ws_test.html` — там UI с кнопками `Connect / Subscribe / message.send`.
+- **`about:blank`** в новой вкладке → DevTools → Console → вставляй js-сниппеты ниже.
+- **`websocat` CLI** — без браузера, см. ниже §"Альтернатива: websocat".
+
+## ⚠️ Важно про Origin (CORS upgrade-check)
+
+`pkg/websocket.Upgrade` ставит `OriginPatterns` из `CORS_ALLOWED_ORIGINS` (`.env`). Если Origin твоей страницы НЕ в whitelist — WS-handshake вернёт **403** ("request Origin ... is not authorized for Host"), браузер закроет с code 1006.
+
+Подводный камень — если открыть `ws_test.html` через **встроенный HTTP-сервер GoLand** (`localhost:63342`) или **двойной клик** (`file://` → Origin null) — Origin не совпадёт с `http://localhost:5173` из default-конфига.
+
+**Workaround:** подними static-server на 5173 в рабочем каталоге проекта и открой через него:
+
+```bash
+python3 -m http.server 5173
+# затем в браузере:
+# http://localhost:5173/manual_qa/3_1_realtime_chat/ws_test.html
+```
+
+Альтернатива — добавь свой dev-origin в `.env`:
+
+```
+CORS_ALLOWED_ORIGINS=http://localhost:5173,http://localhost:63342
+```
+
+и перезапусти сервер.
+
 ## Сценарий 1: connect + subscribe + message.send (happy path)
 
-1. Открой Chrome DevTools → Console.
+1. Открой Chrome DevTools → Console **на about:blank** (или используй `ws_test.html`).
 2. Выполни:
 
 ```js
@@ -90,6 +120,25 @@ curl -i "http://localhost:8080/api/v1/ws"
 
 1. Подключись через WS с любым токеном.
 2. Глянь stdout сервера — путь должен быть `/api/v1/ws?token=REDACTED`, а не реальный токен.
+
+## Альтернатива: websocat (CLI без браузера)
+
+```bash
+brew install websocat
+TOKEN="<access token>"
+CHANNEL="<channel uuid>"
+
+# интерактивный режим: печатаешь JSON-фрейм Enter'ом, видишь входящие
+websocat "ws://localhost:8080/api/v1/ws?token=$TOKEN"
+
+# one-shot subscribe + message.send из stdin:
+printf '%s\n%s\n' \
+  '{"type":"subscribe","channel_id":"'$CHANNEL'"}' \
+  '{"type":"message.send","channel_id":"'$CHANNEL'","text":"hello via websocat"}' \
+  | websocat --max-messages 3 -n0 "ws://localhost:8080/api/v1/ws?token=$TOKEN"
+```
+
+`manual_qa/3_1_realtime_chat/run_smoke.sh` использует именно websocat — запусти его для одной автоматической проверки REST+WS.
 
 ## Post-test чек-лист
 - [ ] Happy-path (Scenario 1) работает: subscribe→ack, message.send→sent+new.

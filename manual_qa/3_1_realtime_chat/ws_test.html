@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Rupor WS smoke</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; max-width: 900px; margin: 24px auto; padding: 0 16px; }
+  textarea, input { width: 100%; box-sizing: border-box; font-family: monospace; }
+  textarea { height: 80px; }
+  #log { background: #111; color: #0f0; padding: 12px; height: 320px; overflow-y: scroll; font-family: monospace; white-space: pre-wrap; }
+  .row { display: flex; gap: 8px; margin: 8px 0; }
+  .row > * { flex: 1; }
+  button { padding: 8px 16px; cursor: pointer; }
+  .pill { display:inline-block; padding:2px 8px; border-radius:10px; font-size:12px; }
+  .ok  { background:#0a0; color:#fff; }
+  .err { background:#a00; color:#fff; }
+</style>
+</head>
+<body>
+<h2>Rupor WS smoke <span id="status" class="pill err">disconnected</span></h2>
+
+<label>access_token:</label>
+<textarea id="token" placeholder="вставь access token Alice"></textarea>
+
+<label>channel_id:</label>
+<input id="channel" placeholder="UUID канала">
+
+<div class="row">
+  <button onclick="connect()">Connect</button>
+  <button onclick="subscribe()">Subscribe</button>
+  <button onclick="sendMsg()">message.send</button>
+  <button onclick="close_()">Close</button>
+</div>
+
+<div class="row">
+  <input id="text" placeholder="текст сообщения" value="hello from ws_test.html">
+</div>
+
+<h3>Log</h3>
+<div id="log"></div>
+
+<script>
+let ws = null;
+const $ = (id) => document.getElementById(id);
+const log = (kind, msg) => {
+  const t = new Date().toISOString().slice(11, 19);
+  $("log").textContent += `[${t}] ${kind}  ${typeof msg === "string" ? msg : JSON.stringify(msg)}\n`;
+  $("log").scrollTop = $("log").scrollHeight;
+};
+const setStatus = (text, ok) => {
+  const el = $("status");
+  el.textContent = text;
+  el.className = "pill " + (ok ? "ok" : "err");
+};
+
+function connect() {
+  const token = $("token").value.trim();
+  if (!token) return alert("token required");
+  if (ws) ws.close();
+  const url = `ws://localhost:8080/api/v1/ws?token=${encodeURIComponent(token)}`;
+  log("→", "DIAL " + url.replace(token, token.slice(0, 20) + "..."));
+  ws = new WebSocket(url);
+  ws.onopen = () => { log("✓", "open"); setStatus("connected", true); };
+  ws.onmessage = (e) => {
+    try { log("←", JSON.parse(e.data)); }
+    catch { log("←", e.data); }
+  };
+  ws.onclose = (e) => { log("✗", `close code=${e.code} reason=${e.reason || "(none)"}`); setStatus("closed " + e.code, false); };
+  ws.onerror = () => { log("!", "error (см. DevTools Network/Console)"); };
+}
+
+function subscribe() {
+  if (!ws || ws.readyState !== 1) return alert("not connected");
+  const channelID = $("channel").value.trim();
+  if (!channelID) return alert("channel_id required");
+  const frame = { type: "subscribe", channel_id: channelID };
+  ws.send(JSON.stringify(frame));
+  log("→", frame);
+}
+
+function sendMsg() {
+  if (!ws || ws.readyState !== 1) return alert("not connected");
+  const channelID = $("channel").value.trim();
+  const text = $("text").value;
+  if (!channelID || !text) return alert("channel_id and text required");
+  const frame = { type: "message.send", channel_id: channelID, text };
+  ws.send(JSON.stringify(frame));
+  log("→", frame);
+}
+
+function close_() {
+  if (ws) ws.close(1000, "manual close");
+}
+</script>
+</body>
+</html>
