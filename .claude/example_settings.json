@@ -1,0 +1,52 @@
+{
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+  },
+  "permissions": {
+    "allow": [
+      "Bash(xargs -I {} find {} -type f -name \".gitkeep\")",
+      "Bash(git -C /Users/bogdanserbatov/Documents/pets/project_rupor rev-parse --short HEAD)",
+      "Bash(git -C /Users/bogdanserbatov/Documents/pets/project_rupor branch --show-current)",
+      "Bash(docker compose *)",
+      "Bash(break)",
+      "Bash(make migrate-up *)",
+      "Bash(go get *)",
+      "Bash(go mod *)",
+      "Bash(go build *)",
+      "Bash(go test *)",
+      "Bash(golangci-lint run *)",
+      "Bash(gofmt -w /Users/bogdanserbatov/Documents/pets/project_rupor/config/config.go)",
+      "Bash(echo \"EXIT=$?\")",
+      "Bash(make lint *)",
+      "Bash(make sqlc *)",
+      "Bash(sqlc version *)",
+      "Bash(brew list *)",
+      "Bash(brew install *)",
+      "Bash(go vet *)",
+      "Bash(gofmt *)",
+      "Bash(docker info *)",
+      "Bash(make dc-up *)",
+      "Bash(docker exec *)",
+      "Bash(curl -s -o /dev/null -w \"\" http://localhost:8080/api/v1/health)",
+      "Bash(curl -s http://localhost:8080/api/v1/health)",
+      "Bash(pkill -INT -f \"exe/server\\\\|go run ./cmd/server\")",
+      "Read(//private/tmp/**)",
+      "Bash(curl -s -m 1 http://localhost:8080/api/v1/health)",
+      "Bash(make migrate-down *)",
+      "Bash(go tool *)",
+      "Read(//tmp/**)",
+      "Bash(command -v golangci-lint)",
+      "Bash(timeout 3 sh -c 'go run ./cmd/server &> /tmp/server.log & *)",
+      "Bash(awk '/^import \\\\\\(/,/^\\\\\\)/' cmd/server/main.go)",
+      "Bash(curl -sS -o /tmp/health.out -w \"HTTP=%{http_code}\\\\n\" http://localhost:8080/api/v1/health)",
+      "Bash(awk '/^func TestArchitecture_ChannelRepoIsolated/,/^}$/' arch_test.go)",
+      "Bash(awk '/^func TestArchitecture_RoomRepoMayImplementChannelPort/,/^}$/' arch_test.go)",
+      "Bash(echo \"BUILD_EXIT=$?\")",
+      "Bash(sort -k1 -n -r)",
+      "Bash(echo \"VET_EXIT=$?\")",
+      "Bash(echo \"LINT_EXIT=$?\")",
+      "Bash(json\" --include=\"*.go\" internal/room/domain/ internal/channel/domain/ 2>&1 | grep -v \"_test.go\")",
+      "Bash(grep -rE \"\\\\b\\(string|int|bool|int64\\) `json\" --include=\"*.go\" internal/room/domain/ internal/channel/domain/ 2>&1 | grep -v \"_test.go\")"
+    ]
+  }
+}

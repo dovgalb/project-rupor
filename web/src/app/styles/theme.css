@@ -1,0 +1,16 @@
+:root {
+  /* Темная тема (Discord-like) — default. D-22 */
+  --color-bg-primary: #1e1f22;
+  --color-bg-secondary: #2b2d31;
+  --color-bg-tertiary: #313338;
+  --color-text-primary: #f2f3f5;
+  --color-text-muted: #b5bac1;
+  --color-accent: #5865f2;
+  --color-danger: #f23f42;
+  --color-success: #23a55a;
+  --color-warning: #f0b232;
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --font-base:
+    "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}

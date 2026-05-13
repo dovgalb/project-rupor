@@ -1,0 +1,205 @@
+# API Integration — HTTP- и WebSocket-клиенты в проекте Rupor (web/)
+
+Единственное место в коде, где происходит сетевое взаимодействие с бэком: `web/src/shared/api/`. Все правила обязательны для агентов Claude.
+
+## Базовые контракты Rupor
+
+- Базовый URL: `/api/v1`. В dev-режиме проксируется через `vite.config.ts` на `http://localhost:8080`.
+- **REST**: JSON, поля camelCase. Заголовок `Authorization: Bearer <jwt>`.
+- **WebSocket**: `/api/v1/ws?token=<jwt>` (токен в query, browser WebSocket API не отдаёт custom headers). JSON-фреймы, payload в snake_case, обёртка `{type, data}` для outbound.
+- **CORS** на бэке: `allowCredentials=false` → никаких cookie-based auth. JWT держим на клиенте.
+- **Logout-эндпоинта нет** → logout = локальная очистка стора и токенов.
+- Полная сводка: `.thoughts/research/2026-05-13-3_5-frontend-baseline.md`.
+
+## Структура shared/api
+
+```
+shared/api/
+├── fetch.ts          — единая fetch-обёртка
+├── ws.ts             — единый WS-клиент
+├── errors.ts         — типы ErrorEnvelope, ApiResult
+├── token-storage.ts  — хранилище токенов (по решению из 03-decisions.md)
+└── refresh.ts        — single-flight refresh access-токена
+```
+
+Никаких других мест с `fetch(...)` или `new WebSocket(...)` в кодовой базе быть не должно.
+
+## Типы
+
+```ts
+export type ErrorEnvelope = {
+  error: { code: string; message: string };
+};
+
+export type ApiResult<T> =
+  | { ok: true;  data: T }
+  | { ok: false; status: number; error: ErrorEnvelope["error"] };
+```
+
+- `ApiResult` — единая обёртка ВСЕХ api-функций. Никаких исключений для штатных ответов.
+- Исключения бросаются только для аномалий (сетевая ошибка, невалидный JSON), и их ловит `fetch`-обёртка и оборачивает в `ApiResult.ok === false` с псевдо-кодом `NETWORK` / `CLIENT`.
+
+## fetch-обёртка
+
+```ts
+export async function apiFetch<T>(
+  path: string,
+  init?: RequestInit,
+): Promise<ApiResult<T>>;
+```
+
+Обязанности:
+
+1. Префикс `/api/v1` подставляется автоматически (или принимать полный путь — определить в `03-decisions.md`).
+2. Подставлять `Authorization: Bearer <accessToken>` для приватных эндпоинтов (либо всегда, если токен есть в storage).
+3. Заголовок `Content-Type: application/json` при наличии body.
+4. **Никогда** не выставлять `credentials: "include"` (бэк `allowCredentials=false`).
+5. Десериализовать JSON, проверить структуру ErrorEnvelope для 4xx/5xx.
+6. На 401 — спецлогика (см. Auto-refresh ниже).
+7. Сетевая ошибка / невалидный JSON — `ApiResult.ok: false, status: 0, error: { code: "NETWORK" | "CLIENT" }`.
+8. Никогда не пробрасывать токен в текст ошибки.
+
+## Auto-refresh
+
+Бэк не делает серверный auto-refresh. Клиент сам разбирает 401:
+
+| Код ошибки | Действие |
+|------------|----------|
+| 401 `AUTH-011` (access expired) | Single-flight refresh → retry оригинального запроса. Прозрачно для пользователя. |
+| 401 `AUTH-007` / `AUTH-008` / `AUTH-009` / `AUTH-010` | Logout: очистка стора + переход на `/login`. Перезалогиниться. |
+
+Реализация single-flight в `refresh.ts`:
+
+- Глобальный promise `currentRefresh: Promise<RefreshResult> | null`.
+- Первый запрос с 401 AUTH-011 стартует `POST /auth/refresh`, кладёт promise в `currentRefresh`.
+- Параллельные 401 ждут тот же promise. Никаких множественных refresh'ей одновременно.
+- После refresh — `currentRefresh = null`. Оригинальные запросы пересабмитятся с новым access.
+- Если refresh упал — `currentRefresh = null` + триггер logout.
+
+Защита от refresh-loop:
+
+- Если оригинальный запрос — это уже `/auth/refresh`, не пытаемся refresh повторно. Сразу logout.
+- Если refresh успешный, но повторный запрос снова даёт 401 AUTH-011 — logout (что-то очень странное, не зацикливаться).
+
+## API-функции фич
+
+В `features/{feature}/api/http.ts`:
+
+```ts
+import { apiFetch } from "@/shared/api/fetch";
+import type { LoginRequest, LoginResponse } from "./types";
+
+export function login(req: LoginRequest) {
+  return apiFetch<LoginResponse>("/auth/login", {
+    method: "POST",
+    body: JSON.stringify(req),
+  });
+}
+```
+
+- Одна функция — один эндпоинт.
+- Тип запроса и ответа — рядом, в `./types.ts` или том же файле.
+- Имена полей DTO ТОЧНО совпадают с бэком (см. `docs/<phase>/08-api-contract.md` и реальный `internal/<domain>/transport/http/dto.go`).
+- Никакой логики кроме сетевого вызова — маппинг DTO → ViewModel живёт в store-action либо в отдельной map-функции той же фичи.
+
+## Хранение токенов
+
+- Стратегия — выбор в `03-decisions.md` (localStorage / sessionStorage / in-memory).
+- Реализация — `shared/api/token-storage.ts`:
+  ```ts
+  export const tokenStorage = {
+    getAccess(): string | null;
+    getRefresh(): string | null;
+    set(tokens: { access: string; refresh: string; accessExpiresAt: string; refreshExpiresAt: string }): void;
+    clear(): void;
+  };
+  ```
+- Никогда не логировать токены. Не отправлять их в сторонние сервисы (аналитика, Sentry без масок).
+- На logout — `tokenStorage.clear()` + `useAuthStore.getState().clear()` + redirect на `/login`.
+
+## WebSocket
+
+```
+shared/api/ws.ts
+```
+
+Обязанности:
+
+1. Подключение по `/api/v1/ws?token=<jwt>` с актуальным accessToken.
+2. Обработка событий: `open`, `close`, `error`, `message`.
+3. Парсинг входящих фреймов в discriminated union `IncomingFrame`.
+4. Отправка outbound-фреймов через типизированную функцию `send(frame: OutgoingFrame)`.
+5. Reconnect с экспоненциальным backoff (стартовая стратегия: 1s, 2s, 5s, 15s, потом капать на 15s; max — по `03-decisions.md`).
+6. После reconnect — восстановление подписок (явные `subscribe` на каналы из state).
+7. Очередь outbound-фреймов на время disconnect (опционально по `03-decisions.md`).
+
+Контракт API:
+
+```ts
+export type WsClient = {
+  connect: () => void;
+  disconnect: () => void;
+  send: (frame: OutgoingFrame) => void;
+  status: "idle" | "connecting" | "open" | "reconnecting" | "closed";
+  onFrame: (handler: (frame: IncomingFrame) => void) => () => void;
+  onStatus: (handler: (s: WsClient["status"]) => void) => () => void;
+};
+```
+
+## WS-протокол Rupor
+
+### Inbound (snake_case в payload)
+
+| `type` | Когда |
+|--------|-------|
+| `subscribed`    | ack на команду `subscribe` |
+| `message.new`   | broadcast в подписке `channel:<id>` |
+| `message.sent`  | ack на команду `message.send` (только отправителю) |
+| `member.joined` | broadcast в подписке `room:<id>` |
+| `error`         | адресная ошибка инициатору |
+
+### Outbound
+
+| `type` | Семантика |
+|--------|-----------|
+| `subscribe`     | `{ type, channel_id }` — подписаться на канал |
+| `message.send`  | `{ type, channel_id, text }` — отправить сообщение |
+
+- Автоподписка на все `room:<id>` пользователя — на стороне сервера при connect.
+- Подписка на канал — явная команда от клиента.
+- Если пользователь только что вступил в комнату через `POST /rooms/join/{code}` — нужен **reconnect WS**, чтобы получить подписку на новый `room:<id>`. Логика reconnect живёт в `ws.ts`, триггерится из `useAuthStore` или из соответствующего action `useRoomsStore.joinByCode`.
+
+## Multi-tab
+
+- Каждая вкладка держит свой WS-конект.
+- `message.sent` приходит только в ту вкладку, через которую отправлено.
+- `message.new` приходит во все вкладки, подписанные на канал.
+- Реконсиляция оптимистичных сообщений в store: при `message.sent` помечаем temp-id как committed; при `message.new` с уже committed `id` — игнорируем дубль.
+
+## Логирование сети
+
+- В dev-режиме допустимы лаконичные логи: `[api] GET /rooms 200`, `[ws] frame {type:"message.new"}`. Реализация — через единый logger в `shared/lib/logger.ts`.
+- В production — без сетевых логов (или только error). Toggle — через `import.meta.env.PROD`.
+- НИКОГДА не логировать тела `/auth/login`, `/auth/refresh`, `/auth/register`. НИКОГДА не логировать `Authorization`-заголовок и query-параметр `token`.
+
+## Запрещено
+
+- `fetch()` или `new WebSocket()` вне `shared/api/` — REJECT.
+- `credentials: "include"` — REJECT (бэк не разрешает credentials).
+- Отправка тел login/refresh/register в логи или в внешние сервисы — REJECT.
+- Хранение токенов в URL (кроме `?token=` на WS-апгрейде) — REJECT.
+- Параллельные `/auth/refresh` без single-flight — REJECT.
+- Refresh-loop без circuit-breaker — REJECT.
+- Поля snake_case в REST DTO или camelCase в WS payload — REJECT (нарушение бэк-контракта).
+- Использование несуществующего `/auth/logout` — REJECT.
+- Catch ошибок в api-функциях без обёртки в `ApiResult` — REJECT.
+
+## Что обязан проверить агент перед коммитом
+
+1. Все сетевые вызовы идут через `shared/api/`.
+2. Все api-функции возвращают `ApiResult<T>`.
+3. Auto-refresh реализован с single-flight и без loop-защиты.
+4. WS reconnect восстанавливает подписки.
+5. DTO-имена полей побайтово совпадают с бэк-контрактом (REST camelCase, WS snake_case).
+6. Никаких токенов в логах, URL-параметрах (кроме `?token=`), error-сообщениях.
+7. Logout-flow: очистка стора + tokenStorage.clear + redirect, без вызова несуществующего эндпоинта.

@@ -1,0 +1,80 @@
+/* ChannelList: список каналов комнаты в Sidebar. */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 0;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  padding: 0 8px;
+}
+
+.title {
+  font-size: 12px;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sectionTitle {
+  font-size: 11px;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  margin: 4px 0 2px 0;
+  padding: 0 8px;
+  display: flex;
+  gap: 4px;
+  align-items: baseline;
+}
+
+.comingSoon {
+  font-size: 10px;
+  color: var(--color-text-muted);
+  text-transform: none;
+  font-style: italic;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.center {
+  display: flex;
+  justify-content: center;
+  padding: 12px 0;
+}
+
+.error {
+  padding: 8px;
+  color: var(--color-danger);
+  font-size: 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.empty {
+  padding: 8px;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}

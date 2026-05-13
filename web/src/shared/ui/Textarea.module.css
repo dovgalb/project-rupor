@@ -1,0 +1,38 @@
+.textarea {
+  width: 100%;
+  padding: 8px 12px;
+  font-family: var(--font-base);
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--color-text-primary);
+  background-color: var(--color-bg-tertiary);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  outline: none;
+  resize: none;
+  /* Современный CSS-API: textarea растёт по содержимому без JS.
+     Поддержка ограничена (Chromium 123+); JS-fallback можно добавить позже при необходимости. */
+  field-sizing: content;
+  min-height: 36px;
+  max-height: 160px;
+  box-sizing: border-box;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.textarea::placeholder {
+  color: var(--color-text-muted);
+}
+
+.textarea:focus-visible {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 30%, transparent);
+}
+
+.textarea:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.invalid {
+  border-color: var(--color-danger);
+}

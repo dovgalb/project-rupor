@@ -1,0 +1,31 @@
+/* Базовая крутилка. Размер задаётся CSS-переменной --size. */
+.spinner {
+  display: inline-block;
+  width: var(--size, 20px);
+  height: var(--size, 20px);
+  border: 2px solid var(--color-bg-tertiary);
+  border-top-color: var(--color-accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.sizeSm {
+  --size: 14px;
+  border-width: 2px;
+}
+
+.sizeMd {
+  --size: 20px;
+  border-width: 2px;
+}
+
+.sizeLg {
+  --size: 36px;
+  border-width: 3px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

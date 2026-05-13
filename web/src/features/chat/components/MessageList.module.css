@@ -1,0 +1,45 @@
+/* MessageList: скроллируемый контейнер сообщений. */
+
+.scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 8px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sentinel {
+  height: 1px;
+  flex-shrink: 0;
+}
+
+.center {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.loadingMore {
+  display: flex;
+  justify-content: center;
+  padding: 8px;
+}
+
+.beginning {
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  padding: 12px 8px 4px 8px;
+  margin: 0;
+}

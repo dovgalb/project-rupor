@@ -1,0 +1,42 @@
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.codeRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.code {
+  flex: 1;
+  font-family: "Courier New", Courier, monospace;
+  font-size: 20px;
+  letter-spacing: 4px;
+  padding: 10px 12px;
+  background-color: var(--color-bg-tertiary);
+  border-radius: var(--radius-sm);
+  text-align: center;
+  user-select: all;
+}
+
+.placeholder {
+  padding: 10px 12px;
+  color: var(--color-text-muted);
+  font-style: italic;
+  text-align: center;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.warning {
+  font-size: 13px;
+  color: var(--color-text-muted);
+  margin: 0;
+}

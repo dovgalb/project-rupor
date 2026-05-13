@@ -37,16 +37,18 @@ curl http://localhost:8080/api/v1/health
 - Архитектура и решения: [docs/project-structure/](docs/1_1_project-structure/)
 - Стандарты кода: [prompts/](prompts/)
 
-## процесс запуска
-1. просим агента /research_codebase + имя фичи + промпт. (выполнить запрос, команда запускает агентов по ресерчу кодовой базы)
+## Процесс запуска 
+1. просим агента /research_нcodebase + имя фичи + промпт. (выполнить запрос, команда запускает агентов по ресерчу кодовой базы)
 пример
 ```/research_codebase add-calls + ( вставить из заранее подготовленного файла промпт для фичи)```
 
-2. После проведения ресерча, запускаем команду /design_feature с такой семантикой (имя фичи, путь до файла с ресерчем )
+2. После проведения ресерча, запускаем команду (/design_feature или /design_frontend_feature) с такой семантикой (имя фичи, путь до файла с ресерчем )
 пример:
 ```/design_feature add_calls .thoughts/research/2020-09-09-audio-calls.md```
+```/design_frontend_feature add_calls_front .thoughts/research/2020-09-09-audio-calls-front.md```
 3. После утверждения дизайна создать детальный план
 пример: ```напиши план```
-4. начинаем с чистого контекстного окна, вызываем команду (/implement_backend + путь к плану + кол-во агентов)
+4. начинаем с чистого контекстного окна, вызываем команду (/implement_backend или /implement_frontend + путь к плану + кол-во агентов)
 пример:
 ```/implement_backend docs/audio-calls/plan```
+```/implement_frontend docs/audio-calls-front/plan```
