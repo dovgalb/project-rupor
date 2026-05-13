@@ -51,3 +51,9 @@ type UUIDGenerator interface {
 // ErrInviteCodeCollision — внутренний sentinel для управляемого ретрая в RegenerateInvite.
 // Не доменная ошибка, не должна всплыть наружу transport-слоя.
 var ErrInviteCodeCollision = errors.New("usecase: invite code collision (retry)")
+
+// RoomEventsPublisher — публикация доменных событий из room/usecase.
+// Контракт: best-effort, ошибки не пробрасываются, реализация не блокирует.
+type RoomEventsPublisher interface {
+	PublishMemberJoined(roomID domain.RoomID, userID domain.UserID, joinedAt time.Time)
+}

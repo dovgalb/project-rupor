@@ -4,10 +4,27 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/dovgalb/project-rupor/pkg/httpx"
 )
+
+// sanitizeURL возвращает path + query, в котором значение query-параметра
+// "token" заменено на "REDACTED". Применяется ко всем путям как
+// defense-in-depth: WS-токен не должен попасть в access-лог.
+func sanitizeURL(u *url.URL) string {
+	if u == nil {
+		return ""
+	}
+	q := u.Query()
+	if q.Get("token") != "" {
+		q.Set("token", "REDACTED")
+	}
+	redacted := *u
+	redacted.RawQuery = q.Encode()
+	return redacted.RequestURI()
+}
 
 // Logger — access-log через slog. Принимает hook для дополнительных attrs (например, user_id).
 func Logger(
@@ -31,7 +48,7 @@ func Logger(
 
 			attrs := []slog.Attr{
 				slog.String("method", r.Method),
-				slog.String("path", r.URL.Path),
+				slog.String("path", sanitizeURL(r.URL)),
 				slog.Int("status", status),
 				slog.Duration("duration", time.Since(start)),
 				slog.String("request_id", requestID),

@@ -1,0 +1,47 @@
+package domain_test
+
+import (
+	"errors"
+	"testing"
+
+	"github.com/google/uuid"
+
+	"github.com/dovgalb/project-rupor/internal/chat/domain"
+)
+
+func TestNewChannelID_Valid_Constructs(t *testing.T) {
+	t.Parallel()
+
+	raw := uuid.New()
+	id, err := domain.NewChannelID(raw)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if id.UUID() != raw {
+		t.Fatalf("UUID() = %v, want %v", id.UUID(), raw)
+	}
+	if id.String() != raw.String() {
+		t.Fatalf("String() = %q, want %q", id.String(), raw.String())
+	}
+	if id.IsZero() {
+		t.Fatal("IsZero() = true, want false")
+	}
+}
+
+func TestNewChannelID_Zero_ReturnsErr(t *testing.T) {
+	t.Parallel()
+
+	_, err := domain.NewChannelID(uuid.Nil)
+	if !errors.Is(err, domain.ErrInvalidChannelID) {
+		t.Fatalf("got %v, want ErrInvalidChannelID", err)
+	}
+}
+
+func TestChannelID_ZeroValue_IsZero(t *testing.T) {
+	t.Parallel()
+
+	var id domain.ChannelID
+	if !id.IsZero() {
+		t.Fatal("zero value: IsZero() = false, want true")
+	}
+}

@@ -125,49 +125,104 @@ WS     /api/v1/ws?token=<jwt>
 ---
 
 ## Фаза 2 — Комнаты и каналы
-- [ ] Миграции: `rooms`, `room_members` (с ролями owner/admin/member), `invites`, `channels` (тип text/voice)
-- [ ] Домен `room`: сущности, роли, инварианты прав
-- [ ] Usecase: создать/получить/удалить комнату, список комнат пользователя
-- [ ] Usecase: генерация инвайта, вступление по коду
-- [ ] Usecase: список участников
-- [ ] Домен `channel`: CRUD каналов внутри комнаты, проверка прав
-- [ ] HTTP: `POST/GET/DELETE /rooms`, `/rooms/:id/invite`, `/rooms/join/:code`, `/rooms/:id/members`
-- [ ] HTTP: `POST/GET/DELETE /rooms/:id/channels`
-- [ ] Репозитории postgres (sqlc) для room/channel
-- [ ] Тесты
+- [x] Миграции: `rooms`, `room_members` (с ролями owner/admin/member), `invites`, `channels` (тип text/voice)
+- [x] Домен `room`: сущности, роли, инварианты прав
+- [x] Usecase: создать/получить/удалить комнату, список комнат пользователя
+- [x] Usecase: генерация инвайта, вступление по коду
+- [x] Usecase: список участников
+- [x] Домен `channel`: CRUD каналов внутри комнаты, проверка прав
+- [x] HTTP: `POST/GET/DELETE /rooms`, `/rooms/:id/invite`, `/rooms/join/:code`, `/rooms/:id/members`
+- [x] HTTP: `POST/GET/DELETE /rooms/:id/channels`
+- [x] Репозитории postgres (sqlc) для room/channel
+- [x] Тесты
 
 ---
 
 ## Фаза 3 — Текстовый чат (реалтайм)
-- [ ] Миграция: `messages` (id, channel_id, author_id, text, created_at) + индексы
-- [ ] `pkg/websocket/`: hub, регистрация подключений, подписка на каналы, broadcast
-- [ ] WebSocket-эндпоинт `/api/v1/ws?token=<jwt>` с авторизацией по JWT
-- [ ] Обработчики событий: `subscribe`, `message.send`, `message.new`, `member.joined`
-- [ ] Домен `chat`: сущности, usecase отправки/чтения сообщений
-- [ ] Сохранение сообщений в БД (sqlc)
-- [ ] REST `GET /channels/:id/messages?before=&limit=` (курсорная пагинация)
-- [ ] Проверка прав (только член комнаты может писать/читать)
-- [ ] Тесты hub'а и usecase
+- [x] Миграция: `messages` (id, channel_id, author_id, text, created_at) + индексы
+- [x] `pkg/websocket/`: hub, регистрация подключений, подписка на каналы, broadcast
+- [x] WebSocket-эндпоинт `/api/v1/ws?token=<jwt>` с авторизацией по JWT
+- [x] Обработчики событий: `subscribe`, `message.send`, `message.new`, `member.joined`
+- [x] Домен `chat`: сущности, usecase отправки/чтения сообщений
+- [x] Сохранение сообщений в БД (sqlc)
+- [x] REST `GET /channels/:id/messages?before=&limit=` (курсорная пагинация)
+- [x] Проверка прав (только член комнаты может писать/читать)
+- [x] Тесты hub'а и usecase
 
 ---
 
-## Фаза 4 — Голосовые звонки
-- [ ] Расширение WS-протокола: `voice.signal` (SDP/ICE)
-- [ ] Сигнальный сервер в `internal/voice/`: маршрутизация SDP/ICE между пирами в одном voice-канале
-- [ ] Состояние voice-канала: список участников, mute/unmute
-- [ ] События: `voice.user-joined`, `voice.user-left`, `voice.mute-changed`
-- [ ] Конфиг STUN (Google публичный)
-- [ ] Тесты сигнализации
+## Фаза 3.5 — Веб-клиент для уже реализованного бэка
+- [ ] `web/` — каркас Vite + React + TypeScript + Zustand
+- [ ] HTTP-клиент: базовый fetch-обёртка, проброс `Authorization: Bearer`, обработка 401
+- [ ] Авторизация: формы регистрации/логина, хранение access/refresh, авто-refresh при 401, logout
+- [ ] Профиль: `GET /auth/me`, отображение текущего пользователя
+- [ ] Комнаты: список своих комнат, создание, удаление, приглашение по коду, вступление по инвайту
+- [ ] Участники комнаты: список членов с ролями
+- [ ] Каналы: список каналов внутри комнаты, создание/удаление text-каналов (voice — заглушка)
+- [ ] Чат: WebSocket-клиент (`/api/v1/ws?token=`), `subscribe` на текущий канал
+- [ ] Чат: загрузка истории через REST с курсорной пагинацией (`before=`, `limit=`), скролл вверх
+- [ ] Чат: отправка сообщений через WS (`message.send`), отображение `message.new` в реалтайме
+- [ ] UI-каркас: сайдбар (комнаты + каналы), основная панель (чат), верхняя панель (профиль)
+- [ ] Базовые состояния: загрузка, пустой список, ошибки сети/авторизации
+- [ ] Сборка фронта через Docker, интеграция в `docker-compose.yml`
+- [ ] Ручное e2e: регистрация → создание комнаты → инвайт → второй пользователь → реалтайм-чат
 
 ---
 
-## Фаза 5 — Веб-клиент (React)
-- [ ] `web/` — Vite + React + Zustand скелет
-- [ ] Формы регистрации/логина, хранение токенов, refresh-флоу
-- [ ] Сайдбар: список комнат и каналов
-- [ ] Чат: WS-клиент, отображение истории, отправка сообщений
-- [ ] Голос: подключение/мут, WebRTC P2P, отображение участников
-- [ ] Сборка через Docker
+## Фаза 4 — Голосовые звонки (бэкенд-сигнализация)
+
+### 4.1 Протокол сигнализации
+- [ ] Спецификация WS-событий клиент→сервер: `voice.join`, `voice.leave`, `voice.signal`, `voice.mute`
+- [ ] Спецификация WS-событий сервер→клиент: `voice.user-joined`, `voice.user-left`, `voice.signal`, `voice.mute-changed`, `voice.participants` (снапшот при входе)
+- [ ] Формат `voice.signal`: `{from_user_id, to_user_id, channel_id, payload: {sdp|ice}}` — адресная маршрутизация по `to_user_id`
+- [ ] Описание формата в `docs/voice/protocol.md`
+
+### 4.2 Домен voice
+- [ ] `internal/voice/domain/`: `VoiceRoom` (состояние voice-канала), `Participant` (user_id, mute), доменные ошибки
+- [ ] Инварианты: один пользователь в одном voice-канале одновременно, дубль-join обрабатывается как rejoin
+- [ ] Чистые функции изменения состояния (add/remove/setMute), отдельно от конкурентного доступа
+
+### 4.3 Usecase voice
+- [ ] Интерфейсы зависимостей: проверка членства в room, рассылка событий через WS-hub
+- [ ] Usecase `JoinVoice`: проверка прав → добавление участника → broadcast `voice.user-joined` остальным + ответ `voice.participants` инициатору
+- [ ] Usecase `LeaveVoice`: удаление → broadcast `voice.user-left`
+- [ ] Usecase `RelaySignal`: проверка, что отправитель и получатель в одном voice-канале → доставка `voice.signal` целевому пиру
+- [ ] Usecase `SetMute`: обновление состояния → broadcast `voice.mute-changed`
+- [ ] Авто-leave при разрыве WS (через хук в hub'е)
+
+### 4.4 Хранение состояния
+- [ ] In-memory реестр voice-каналов с потокобезопасным доступом (RWMutex или sharded map)
+- [ ] НЕ персистится в БД — состояние эфемерное, при рестарте сервера сбрасывается
+- [ ] Очистка пустых voice-каналов
+
+### 4.5 Интеграция с WS-hub
+- [ ] Расширение роутинга WS-событий в `internal/chat/transport/ws/handler.go` (или общий диспетчер)
+- [ ] Адресная отправка сообщения конкретному `user_id` через hub (а не только broadcast на канал)
+- [ ] Хук on-disconnect для авто-leave из voice
+
+### 4.6 Конфигурация ICE
+- [ ] Эндпоинт `GET /api/v1/voice/ice-servers` — отдаёт список STUN/TURN серверов
+- [ ] Дефолт: публичный Google STUN (`stun:stun.l.google.com:19302`)
+- [ ] Конфигурация через env (`VOICE_STUN_URLS`, `VOICE_TURN_URL`, `VOICE_TURN_USERNAME`, `VOICE_TURN_CREDENTIAL`)
+
+### 4.7 Тесты
+- [ ] Unit-тесты доменных функций состояния voice-канала
+- [ ] Unit-тесты usecase с моками hub'а и репо членства
+- [ ] Интеграционный тест: два фейковых WS-клиента, join → обмен `voice.signal` → leave
+
+---
+
+## Фаза 5 — Веб-клиент: голос и финализация
+- [ ] WebRTC: получение `RTCConfiguration` через `GET /voice/ice-servers`
+- [ ] WebRTC: подключение к voice-каналу (`voice.join`), создание `RTCPeerConnection` на каждого участника (mesh)
+- [ ] WebRTC: обмен offer/answer/ICE через `voice.signal`, прикрепление аудио-потоков к `<audio>`
+- [ ] UI: кнопка «зайти/выйти», индикатор активного voice-канала
+- [ ] UI: список участников голоса с индикатором mute и говорящего (volume meter)
+- [ ] Кнопка mute/unmute с отправкой `voice.mute`
+- [ ] Корректный teardown при выходе/смене канала/разрыве WS
+- [ ] Обработка отказа в доступе к микрофону, отсутствия устройств
+- [ ] Полировка UX: тёмная тема, адаптивная вёрстка, тосты ошибок
+- [ ] Ручное e2e: два браузера, голосовое соединение через NAT
 
 ---
 
