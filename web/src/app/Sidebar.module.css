@@ -1,0 +1,9 @@
+/* Sidebar — левая навигационная панель. Phase 5 — пустая. */
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 8px;
+  gap: 8px;
+}

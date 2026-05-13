@@ -1,0 +1,11 @@
+/* TopBar — верхняя панель shell. Высота 48px, фиксируется grid-area из AppShell. */
+
+.topbar {
+  grid-area: topbar;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 16px;
+  background-color: var(--color-bg-secondary);
+  border-bottom: 1px solid var(--color-bg-tertiary);
+}

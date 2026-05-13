@@ -1,4 +1,5 @@
-.PHONY: run build test lint fmt vet migrate-up migrate-down sqlc dc-up dc-down dc-logs install-hooks init-project help
+.PHONY: run build test lint fmt vet migrate-up migrate-down sqlc dc-up dc-down dc-logs install-hooks init-project help \
+        web-install web-dev web-build web-test web-lint web-typecheck web-e2e
 
 # Загружаем .env, если есть. Не падаем, если нет.
 ifneq (,$(wildcard ./.env))
@@ -25,6 +26,15 @@ help:
 	@echo "  dc-logs       — docker compose logs -f"
 	@echo "  install-hooks — включить git-хуки из .githooks/"
 	@echo "  init-project  — полная инициализация окружения (env, deps, hooks, db, migrations)"
+	@echo ""
+	@echo "Web (web/):"
+	@echo "  web-install   — npm --prefix web install"
+	@echo "  web-dev       — Vite dev-сервер (localhost:5173)"
+	@echo "  web-build     — production-сборка в web/dist"
+	@echo "  web-test      — vitest --run"
+	@echo "  web-lint      — eslint --max-warnings=0"
+	@echo "  web-typecheck — tsc --noEmit"
+	@echo "  web-e2e       — Playwright E2E"
 
 run:
 	go run ./cmd/server
@@ -90,3 +100,26 @@ init-project:
 	@$(MAKE) migrate-up
 	@echo ""
 	@echo "Готово. Запусти сервер: make run"
+
+# === Web (web/) ===
+
+web-install:
+	npm --prefix web install
+
+web-dev:
+	npm --prefix web run dev
+
+web-build:
+	npm --prefix web run build
+
+web-test:
+	npm --prefix web run test -- --run
+
+web-lint:
+	npm --prefix web run lint
+
+web-typecheck:
+	npm --prefix web run typecheck
+
+web-e2e:
+	npm --prefix web run e2e

@@ -1,0 +1,9 @@
+/* ChatPanel: column-flex, MessageList растёт, composer прижат к низу. */
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background-color: var(--color-bg-primary);
+}

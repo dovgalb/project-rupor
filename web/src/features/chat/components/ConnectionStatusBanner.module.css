@@ -1,0 +1,9 @@
+/* ConnectionStatusBanner: жёлтая полоса под TopBar при connecting/reconnecting. */
+
+.banner {
+  padding: 8px 16px;
+  background-color: var(--color-warning);
+  color: var(--color-bg-primary);
+  font-size: 13px;
+  text-align: center;
+}

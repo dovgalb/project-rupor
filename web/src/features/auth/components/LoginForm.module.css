@@ -1,0 +1,28 @@
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  max-width: 360px;
+}
+
+.serverError {
+  color: var(--color-danger);
+  font-size: 13px;
+}
+
+.footer {
+  display: flex;
+  justify-content: center;
+  margin-top: 8px;
+  font-size: 13px;
+}
+
+.link {
+  color: var(--color-accent);
+  text-decoration: none;
+}
+
+.link:hover {
+  text-decoration: underline;
+}

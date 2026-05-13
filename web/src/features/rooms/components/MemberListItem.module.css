@@ -1,0 +1,24 @@
+.item {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+}
+
+.name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.badge {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  padding: 1px 6px;
+  border-radius: 4px;
+  background-color: var(--color-bg-tertiary);
+}

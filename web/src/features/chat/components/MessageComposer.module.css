@@ -1,0 +1,22 @@
+/* MessageComposer: textarea + ряд с кнопкой и счётчиком. */
+
+.composer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--color-bg-tertiary);
+  background-color: var(--color-bg-secondary);
+}
+
+.bottomRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.counter {
+  font-size: 11px;
+  color: var(--color-text-muted);
+}

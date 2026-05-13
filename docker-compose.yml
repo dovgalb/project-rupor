@@ -16,5 +16,22 @@ services:
       timeout: 3s
       retries: 5
 
+  # Hybrid (Phase 10): web — в контейнере, api по-прежнему `make run` локально.
+  # nginx внутри контейнера проксирует /api/v1 на host.docker.internal:8080.
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    container_name: rupor-web
+    ports:
+      - "${WEB_PORT:-3000}:80"
+    extra_hosts:
+      # На Docker Desktop (macOS/Windows) host.docker.internal работает из коробки,
+      # на Linux его нужно явно зарезолвить в IP хоста.
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - postgres
+    restart: unless-stopped
+
 volumes:
   rupor-pg-data:

@@ -1,0 +1,29 @@
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: #fff;
+  font-weight: 600;
+  font-family: var(--font-base);
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.sizeSm {
+  width: 24px;
+  height: 24px;
+  font-size: 10px;
+}
+
+.sizeMd {
+  width: 32px;
+  height: 32px;
+  font-size: 12px;
+}
+
+.sizeLg {
+  width: 48px;
+  height: 48px;
+  font-size: 18px;
+}
