@@ -12,14 +12,17 @@ import (
 	"github.com/dovgalb/project-rupor/internal/chat/usecase"
 )
 
+// ListMessagesHandler — HTTP-хендлер GET /channels/{channelID}/messages.
 type ListMessagesHandler struct {
 	uc *usecase.ListMessages
 }
 
+// NewListMessagesHandler собирает хендлер из сценария ListMessages.
 func NewListMessagesHandler(uc *usecase.ListMessages) *ListMessagesHandler {
 	return &ListMessagesHandler{uc: uc}
 }
 
+// ServeHTTP читает channelID/before/limit, делегирует сценарию и возвращает страницу сообщений.
 func (h *ListMessagesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	uid, ok := authmw.UserIDFromContext(r.Context())
 	if !ok {

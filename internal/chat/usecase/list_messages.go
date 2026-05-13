@@ -9,21 +9,25 @@ import (
 	"github.com/dovgalb/project-rupor/internal/chat/domain"
 )
 
+// Границы limit для пагинации истории сообщений.
 const (
 	DefaultLimit = 50
 	MinLimit     = 1
 	MaxLimit     = 100
 )
 
+// ListMessages — сценарий получения страницы истории сообщений канала с курсорной пагинацией.
 type ListMessages struct {
 	messages   MessageRepository
 	membership MembershipQuery
 }
 
+// NewListMessages собирает сценарий ListMessages из его зависимостей.
 func NewListMessages(messages MessageRepository, membership MembershipQuery) *ListMessages {
 	return &ListMessages{messages: messages, membership: membership}
 }
 
+// ListMessagesInput — входные данные сценария ListMessages.
 type ListMessagesInput struct {
 	ActorID   uuid.UUID
 	ChannelID uuid.UUID
@@ -31,11 +35,14 @@ type ListMessagesInput struct {
 	Limit     int
 }
 
+// ListMessagesOutput — результат сценария: страница сообщений и курсор следующей страницы.
 type ListMessagesOutput struct {
 	Items      []*domain.Message
 	NextBefore uuid.UUID // uuid.Nil если это последняя страница
 }
 
+// Execute проверяет членство актора в канале и возвращает страницу сообщений до курсора Before.
+// NextBefore выставляется только если страница заполнена полностью.
 func (uc *ListMessages) Execute(ctx context.Context, in ListMessagesInput) (ListMessagesOutput, error) {
 	actorID, err := domain.NewUserID(in.ActorID)
 	if err != nil {
@@ -72,7 +79,7 @@ func (uc *ListMessages) Execute(ctx context.Context, in ListMessagesInput) (List
 	}
 
 	var nextBefore uuid.UUID
-	if len(items) == limit && limit > 0 {
+	if len(items) == limit {
 		nextBefore = items[len(items)-1].ID().UUID()
 	}
 	return ListMessagesOutput{Items: items, NextBefore: nextBefore}, nil

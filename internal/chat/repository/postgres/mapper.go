@@ -9,6 +9,7 @@ import (
 	"github.com/dovgalb/project-rupor/internal/chat/repository/postgres/db"
 )
 
+// messageRowToDomain восстанавливает доменное сообщение из строки таблицы messages.
 func messageRowToDomain(row db.Message) (*domain.Message, error) {
 	id, err := domain.NewMessageID(row.ID)
 	if err != nil {
@@ -29,6 +30,7 @@ func messageRowToDomain(row db.Message) (*domain.Message, error) {
 	return domain.ReconstructMessage(id, channelID, authorID, text, row.CreatedAt.UTC())
 }
 
+// domainToInsertMessageParams готовит параметры sqlc-запроса InsertMessage из доменного сообщения.
 func domainToInsertMessageParams(m *domain.Message) db.InsertMessageParams {
 	return db.InsertMessageParams{
 		ID:        m.ID().UUID(),

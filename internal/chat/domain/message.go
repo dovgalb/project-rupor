@@ -2,6 +2,7 @@ package domain
 
 import "time"
 
+// Message — доменная сущность сообщения в текстовом канале.
 type Message struct {
 	id        MessageID
 	channelID ChannelID
@@ -10,6 +11,7 @@ type Message struct {
 	createdAt time.Time
 }
 
+// NewMessage собирает сообщение и проверяет инварианты идентификаторов и createdAt.
 func NewMessage(
 	id MessageID,
 	channelID ChannelID,
@@ -38,6 +40,7 @@ func NewMessage(
 	}, nil
 }
 
+// ReconstructMessage восстанавливает сообщение из репозитория, применяя те же инварианты, что и NewMessage.
 func ReconstructMessage(
 	id MessageID,
 	channelID ChannelID,
@@ -48,8 +51,17 @@ func ReconstructMessage(
 	return NewMessage(id, channelID, authorID, text, createdAt)
 }
 
-func (m *Message) ID() MessageID        { return m.id }
+// ID возвращает идентификатор сообщения.
+func (m *Message) ID() MessageID { return m.id }
+
+// ChannelID возвращает идентификатор канала, в который отправлено сообщение.
 func (m *Message) ChannelID() ChannelID { return m.channelID }
-func (m *Message) AuthorID() UserID     { return m.authorID }
-func (m *Message) Text() MessageText    { return m.text }
+
+// AuthorID возвращает идентификатор автора сообщения.
+func (m *Message) AuthorID() UserID { return m.authorID }
+
+// Text возвращает текст сообщения.
+func (m *Message) Text() MessageText { return m.text }
+
+// CreatedAt возвращает момент создания сообщения в UTC.
 func (m *Message) CreatedAt() time.Time { return m.createdAt }

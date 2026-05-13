@@ -10,6 +10,7 @@ import (
 	"github.com/dovgalb/project-rupor/internal/chat/domain"
 )
 
+// SendMessage — сценарий отправки нового сообщения в текстовый канал.
 type SendMessage struct {
 	messages    MessageRepository
 	membership  MembershipQuery
@@ -18,6 +19,7 @@ type SendMessage struct {
 	uuids       UUIDGenerator
 }
 
+// NewSendMessage собирает сценарий SendMessage из его зависимостей.
 func NewSendMessage(
 	messages MessageRepository,
 	membership MembershipQuery,
@@ -34,12 +36,14 @@ func NewSendMessage(
 	}
 }
 
+// SendMessageInput — входные данные сценария SendMessage.
 type SendMessageInput struct {
 	ActorID   uuid.UUID
 	ChannelID uuid.UUID
 	Text      string
 }
 
+// SendMessageOutput — результат сценария: сохранённое сообщение.
 type SendMessageOutput struct {
 	MessageID uuid.UUID
 	ChannelID uuid.UUID
@@ -48,6 +52,7 @@ type SendMessageOutput struct {
 	CreatedAt time.Time
 }
 
+// Execute проверяет членство, сохраняет сообщение и публикует событие message.new в шину (best-effort).
 func (uc *SendMessage) Execute(ctx context.Context, in SendMessageInput) (SendMessageOutput, error) {
 	actorID, err := domain.NewUserID(in.ActorID)
 	if err != nil {

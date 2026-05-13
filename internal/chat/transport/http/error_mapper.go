@@ -9,12 +9,14 @@ import (
 	"github.com/dovgalb/project-rupor/pkg/httpx"
 )
 
+// httpError — внутреннее представление HTTP-ошибки чата с кодом и сообщением.
 type httpError struct {
 	status int
 	code   string
 	msg    string
 }
 
+// mapError переводит доменные/usecase-ошибки в httpError со стабильными кодами CHAT-XXX/AUTH-XXX.
 func mapError(err error) httpError {
 	switch {
 	case errors.Is(err, domain.ErrInvalidMessageText):
@@ -38,14 +40,17 @@ func mapError(err error) httpError {
 	}
 }
 
+// writeError пишет JSON-ответ об ошибке по нормализованному httpError.
 func writeError(w http.ResponseWriter, e httpError) {
 	httpx.WriteJSONError(w, e.status, e.code, e.msg)
 }
 
+// writeLimitError возвращает 400 при выходе limit за допустимый диапазон.
 func writeLimitError(w http.ResponseWriter) {
 	writeError(w, httpError{http.StatusBadRequest, "CHAT-006", "limit must be 1..100"})
 }
 
+// writeBadUUIDError возвращает 400 при невалидном UUID в path/query.
 func writeBadUUIDError(w http.ResponseWriter) {
 	writeError(w, httpError{http.StatusBadRequest, "CHAT-005", "invalid uuid in path/query"})
 }

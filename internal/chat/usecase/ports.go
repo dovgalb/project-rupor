@@ -9,8 +9,10 @@ import (
 	"github.com/dovgalb/project-rupor/internal/chat/domain"
 )
 
+// RoleRequirement — минимальная требуемая роль участника комнаты для операции в канале.
 type RoleRequirement int
 
+// Возможные значения RoleRequirement по возрастанию строгости.
 const (
 	RoleAnyMember RoleRequirement = iota
 	RoleAdminOrOwner
@@ -29,6 +31,7 @@ type MembershipQuery interface {
 	Require(ctx context.Context, channelID domain.ChannelID, userID domain.UserID, req RoleRequirement) error
 }
 
+// Поддерживаемые виды каналов, возвращаемые MessageRepository.ChannelOf.
 const (
 	ChannelKindText  = "text"
 	ChannelKindVoice = "voice"
@@ -55,6 +58,8 @@ type Broadcaster interface {
 	PublishToRoom(roomID domain.RoomID, eventType string, payload any)
 }
 
+// Clock — источник текущего времени, инжектируется ради тестируемости.
 type Clock interface{ Now() time.Time }
 
+// UUIDGenerator — генератор UUID, инжектируется ради тестируемости.
 type UUIDGenerator interface{ New() uuid.UUID }

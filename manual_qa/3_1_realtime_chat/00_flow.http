@@ -1,9 +1,9 @@
 @host = http://localhost:8080
-@access_token_a = <получи из шага login user A ниже>
-@access_token_b = <получи из шага login user B ниже>
-@room_id = <получи из шага create room ниже>
-@invite_code = <получи из шага invite ниже>
-@channel_id = <получи из шага create channel ниже>
+@access_token_a = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxYWE1YWIwYy1kOWQwLTQ2ODYtYTY1OS1lZTQxMmZhYTRiNmUiLCJleHAiOjE3Nzg2MDkwNDcsImlhdCI6MTc3ODYwODE0N30.Vki_H75PUH0mqL1bxC4W5QfltzrycPDUAnhYsaoWEzE
+@access_token_b = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiMTg0NDVkZS03YTYwLTRiM2EtOWU3Ny0xYmRmYmE4YWMzMjciLCJleHAiOjE3Nzg2MDkwNjAsImlhdCI6MTc3ODYwODE2MH0.p0q7J5AhISo1BJ4Mtdt9Dq71DBkO9lW1I1OwGLoF6Q8
+@room_id = 9dbce357-b5de-4747-a9b2-6e028f6e8db9
+@invite_code = 8PTZ4K73
+@channel_id = 51cd39fb-f1a2-41a7-955e-4076f9cfca03
 
 # Happy-path сценарий для PR-3.1 realtime chat.
 # Прерхрек:
@@ -80,7 +80,7 @@ Content-Type: application/json
 {
   "code": "{{invite_code}}"
 }
-
+###
 # Ожидаемый результат: 200 OK. Если Alice была в этот момент подключена через WS,
 # она получила событие `member.joined` в room-topic.
 

@@ -13,14 +13,17 @@ import (
 	"github.com/dovgalb/project-rupor/internal/chat/usecase"
 )
 
+// MessageRepository — реализация usecase.MessageRepository поверх PostgreSQL/sqlc.
 type MessageRepository struct {
 	q *db.Queries
 }
 
+// NewMessageRepository собирает репозиторий поверх пула pgx.
 func NewMessageRepository(pool *pgxpool.Pool) *MessageRepository {
 	return &MessageRepository{q: db.New(pool)}
 }
 
+// Save вставляет новое сообщение в таблицу messages.
 func (r *MessageRepository) Save(ctx context.Context, m *domain.Message) error {
 	if err := r.q.InsertMessage(ctx, domainToInsertMessageParams(m)); err != nil {
 		return fmt.Errorf("postgres: insert message: %w", err)
@@ -28,6 +31,8 @@ func (r *MessageRepository) Save(ctx context.Context, m *domain.Message) error {
 	return nil
 }
 
+// ListByChannel возвращает страницу сообщений канала по убыванию created_at до курсора before.
+// Передача zero-value before означает "от самых свежих".
 func (r *MessageRepository) ListByChannel(
 	ctx context.Context,
 	channelID domain.ChannelID,
@@ -53,6 +58,7 @@ func (r *MessageRepository) ListByChannel(
 	return out, nil
 }
 
+// ChannelOf возвращает базовые сведения о канале (room_id, kind) или domain.ErrChannelNotFound.
 func (r *MessageRepository) ChannelOf(
 	ctx context.Context,
 	channelID domain.ChannelID,

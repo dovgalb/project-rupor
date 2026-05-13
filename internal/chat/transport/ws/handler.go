@@ -16,14 +16,18 @@ import (
 	pws "github.com/dovgalb/project-rupor/pkg/websocket"
 )
 
+// WSHandler — HTTP-хендлер апгрейда соединения до WebSocket и обработки событий чата.
 type WSHandler struct {
 	deps WSDeps
 }
 
+// NewWSHandler собирает WSHandler из набора зависимостей.
 func NewWSHandler(deps WSDeps) *WSHandler {
 	return &WSHandler{deps: deps}
 }
 
+// ServeHTTP аутентифицирует клиента по query-параметру token, апгрейдит соединение и запускает readLoop.
+// Подписка на room-topic'и пользователя выполняется автоматически при подключении.
 func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	logger := slog.Default()
@@ -72,6 +76,7 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.readLoop(ctx, conn, userID.UUID())
 }
 
+// readLoop читает входящие фреймы и диспатчит их по типу события до закрытия соединения.
 func (h *WSHandler) readLoop(ctx context.Context, conn *pws.Conn, userID uuid.UUID) {
 	for {
 		var in inboundEvent
@@ -89,6 +94,7 @@ func (h *WSHandler) readLoop(ctx context.Context, conn *pws.Conn, userID uuid.UU
 	}
 }
 
+// handleSubscribe проверяет членство и подписывает соединение на topic канала.
 func (h *WSHandler) handleSubscribe(ctx context.Context, conn *pws.Conn, userID uuid.UUID, in inboundEvent) {
 	channelID, err := uuid.Parse(in.ChannelID)
 	if err != nil {
@@ -114,6 +120,7 @@ func (h *WSHandler) handleSubscribe(ctx context.Context, conn *pws.Conn, userID 
 	_ = conn.WriteJSON(ctx, subscribedFrame(channelID))
 }
 
+// handleMessageSend делегирует сценарию SendMessage и отвечает автору фреймом message.sent.
 func (h *WSHandler) handleMessageSend(ctx context.Context, conn *pws.Conn, userID uuid.UUID, in inboundEvent) {
 	channelID, err := uuid.Parse(in.ChannelID)
 	if err != nil {

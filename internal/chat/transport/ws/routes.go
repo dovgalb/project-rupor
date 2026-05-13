@@ -8,6 +8,7 @@ import (
 	pws "github.com/dovgalb/project-rupor/pkg/websocket"
 )
 
+// WSDeps — зависимости WS-эндпоинта чата: hub, сценарий отправки, порты членства, аутентификация и origin-фильтр.
 type WSDeps struct {
 	Hub                *pws.Hub
 	SendMessage        *usecase.SendMessage
@@ -18,6 +19,7 @@ type WSDeps struct {
 	OriginPatterns     []string
 }
 
+// RegisterWSRoute монтирует GET /ws на роутере.
 func RegisterWSRoute(r chi.Router, deps WSDeps) {
 	r.Get("/ws", NewWSHandler(deps).ServeHTTP)
 }
