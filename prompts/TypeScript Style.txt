@@ -1,0 +1,161 @@
+# TypeScript Style — как писать TS-код в проекте Rupor (web/)
+
+База — официальный TypeScript Handbook + ECMAScript-стандарт. Ниже — наши уточнения и правила, обязательные для агентов Claude.
+
+## Общее
+
+- TypeScript 5.x в strict-режиме. Любые послабления (`strict: false`, `noImplicitAny: false`) запрещены без согласования.
+- Prettier — обязательное форматирование. Любой код, не проходящий Prettier, считается сломанным.
+- ESLint — обязательный линтер, запуск через `npm run lint`.
+- Плоское лучше вложенного. Скучное лучше креативного. Явное лучше неявного.
+- Код, идентификаторы и commit-сообщения — по-английски. Комментарии и UI-тексты — по-русски.
+
+## Strict-настройки tsconfig
+
+Обязательно включены:
+
+- `strict: true`
+- `noUncheckedIndexedAccess: true`
+- `noImplicitOverride: true`
+- `exactOptionalPropertyTypes: true`
+- `noFallthroughCasesInSwitch: true`
+
+Эти флаги не отключаются «временно» — отключение требует согласования с Lead-ом.
+
+## Запрет на `any`
+
+- `any` запрещён.
+- Если действительно нужен — `unknown` с дальнейшей проверкой через guard.
+- Исключения возможны только с комментарием:
+  ```ts
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- причина: ...
+  ```
+  и согласованием Lead-а.
+- `as any`, `as unknown as X` — запрещены. Если данные приходят с типом, не соответствующим ожиданию — это контракт-баг, чинить контракт.
+
+## Именование
+
+- Файлы компонентов: `PascalCase.tsx` (`LoginForm.tsx`).
+- Файлы прочие (hooks, utils, api): `camelCase.ts` (`useAuthStore.ts`, `formatDate.ts`).
+- Барреллы: `index.ts`.
+- Папки фичей и shared-сегментов: `kebab-case` или одно слово в нижнем регистре (`auth`, `rooms`, `shared`).
+- Переменные и функции: `camelCase`.
+- React-компоненты, типы, интерфейсы, enums: `PascalCase`.
+- Константы-литералы: `SCREAMING_SNAKE_CASE` только для настоящих констант (`MAX_MESSAGE_LENGTH = 4000`).
+- Hooks: `useXxx`.
+- Async-функции и actions: глагол (`fetchRooms`, `sendMessage`).
+
+## Типизация DTO и ViewModel
+
+- DTO (как с бэка) и ViewModel (как UI потребляет) — РАЗНЫЕ типы.
+- Суффиксы для ясности:
+  - `*Dto` — общая форма данных от бэка (`RoomDto`, `MessageDto`).
+  - `*Request` / `*Response` — формы конкретного эндпоинта (`LoginRequest`, `LoginResponse`).
+  - `*Frame` — WS-фреймы (`SubscribeFrame`, `MessageNewFrame`).
+  - ViewModel — без суффикса (`Room`, `Message`).
+- Имена полей DTO ТОЧНО совпадают с бэком:
+  - REST DTO — camelCase (как в `internal/<domain>/transport/http/dto.go`).
+  - WS-фреймы — snake_case (как в `internal/chat/transport/ws/event_dto.go`).
+- Маппинг DTO → ViewModel живёт в `features/{feature}/api/`, не в компонентах.
+
+## Дискриминированные union'ы
+
+- Для WS-фреймов и любых полиморфных событий — discriminated union на поле `type`:
+  ```ts
+  type IncomingFrame =
+    | { type: "subscribed";    data: { channel_id: string } }
+    | { type: "message.new";   data: MessageNewPayload }
+    | { type: "message.sent";  data: MessageSentPayload }
+    | { type: "member.joined"; data: MemberJoinedPayload }
+    | { type: "error";         data: ErrorPayload };
+  ```
+- Обработка через `switch (frame.type)` с `exhaustive` проверкой (`assertNever`).
+
+## Enums
+
+- Предпочитать `const`-объекты + `as const` + literal-union вместо `enum`:
+  ```ts
+  export const Role = { Owner: "owner", Admin: "admin", Member: "member" } as const;
+  export type Role = (typeof Role)[keyof typeof Role];
+  ```
+- `enum` в стиле TypeScript-enum'а — допустим, но без `const enum` (ломает сборку Vite в strict).
+
+## Опциональность и null
+
+- `null` — для «значение отсутствует осмысленно» (например, `nextBefore: string | null` в курсоре).
+- `undefined` — для «значение ещё не определено».
+- Не смешивать: тип поля DTO от бэка — точно как бэк отдаёт (если бэк шлёт `null` — типизируй `null`).
+- Опциональные поля — `?:` только когда поле реально может отсутствовать в payload (по API-контракту), не «для гибкости».
+
+## Функции и сигнатуры
+
+- Public-функции — явный return type, если не очевидно из контекста и не однострочник.
+- Async-функции возвращают `Promise<T>` — не забывать.
+- Не использовать `function expression` для компонентов — только `function` declaration или arrow:
+  ```ts
+  export function LoginForm(props: LoginFormProps) { ... }
+  ```
+- Колбэки в props — типизировать строго: `onSubmit: (values: LoginValues) => void | Promise<void>`.
+
+## Ошибки
+
+- `try/catch` — только там, где есть стратегия обработки. Без catch — пробрасываем.
+- В catch не использовать `e: any` или `e: Error` — типизация `unknown`, дальше `instanceof Error` / type guard.
+- В api-слое не бросать исключения для штатных ответов — оборачивать в `ApiResult<T, ErrorEnvelope>` (см. `API Integration.txt`).
+- React error-boundary — отдельный компонент в `shared/ui/`, оборачивает критические зоны.
+
+## Управление потоком
+
+- Ранние возвраты (early return). Не `else` после `return`.
+- Не вложенные `if` более 3 уровней — выносить в отдельную функцию или хук.
+- `switch` для дискриминированных union'ов; иначе — `if/else if` нормально.
+
+## Иммутабельность
+
+- `const` по умолчанию. `let` только когда переменная реально меняется.
+- Для массивов и объектов в state — никогда не мутировать, всегда возвращать новый.
+- В Zustand-actions использовать `set((state) => ({ ... }))` без in-place мутаций (если не подключён immer middleware — см. `Zustand Stores.txt`).
+
+## Импорты
+
+- Один импорт-блок на источник: `import { a, b } from "@/shared/api"`.
+- Алиас `@/` для путей от `src/`. Никаких `../../../../`.
+- Type-imports разделять: `import type { Room } from "./types"`.
+- Импорты — сверху файла, между группами (внешние, внутренние, типы) — пустая строка.
+
+## Комментарии и документация
+
+- JSDoc — только для публичных API фичи или shared-функций, чьё назначение не очевидно из имени.
+- Комментарии в коде — по-русски, кратко, объясняют ЗАЧЕМ, а не ЧТО.
+- TODO/FIXME — с автором и контекстом: `// TODO(bogdan): рефакторинг после фазы 2`.
+
+## Конфигурация
+
+- Конфиг фронта читается из env через Vite (`import.meta.env.VITE_*`).
+- Все required env — проверяются на старте (например, в `app/config.ts`), fail fast.
+- Никаких `config.json` или хардкода URL.
+
+## Логирование (DevTools)
+
+- В продакшен-сборке — никаких `console.log`. Только `console.error` для критичных проблем, и то лучше через единый logger в `shared/lib/`.
+- ESLint-правило `no-console` — включено, исключения только через `console.warn` / `console.error` с обоснованием.
+- НЕ логировать токены, пароли, тела login/refresh-запросов.
+
+## Запрещено без согласования
+
+- Добавлять npm-зависимости в `package.json`.
+- Менять `tsconfig.json` (особенно strict-флаги).
+- Использовать `eval`, `new Function(string)`, `setTimeout(string)`.
+- Использовать `@ts-ignore` / `@ts-expect-error` без объясняющего комментария.
+- Писать свой роутер, свой стейт-менеджер, свой fetch-клиент.
+- Расширять глобальные интерфейсы (`declare global`) без согласования.
+
+## Что обязан проверить агент перед коммитом
+
+1. `npm --prefix web run typecheck` — 0 ошибок.
+2. `npm --prefix web run lint` — 0 ошибок.
+3. `npm --prefix web run test -- --run` — все тесты зелёные.
+4. `npm --prefix web run build` — собирается чисто.
+5. Никаких `any` без обоснования.
+6. DTO-имена полей побайтово совпадают с бэком.
+7. Нет новых npm-зависимостей без согласования.

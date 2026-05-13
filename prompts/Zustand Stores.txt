@@ -1,0 +1,169 @@
+# Zustand Stores — паттерн сторов в проекте Rupor (web/)
+
+Zustand — единственный механизм глобального состояния в проекте. Никакого Redux / MobX / Context для глобального state. Все правила обязательны для агентов Claude.
+
+## Где живут сторы
+
+- Сторы фичи — `web/src/features/{feature}/store/`.
+- Общие сторы (например, сетевой статус, тема) — `web/src/shared/state/` (если появляется второй такой).
+- Один store на feature (`useAuthStore`, `useRoomsStore`, `useChannelsStore`, `useChatStore`). Дробить только при реальной разнице lifecycle.
+
+## Сигнатура
+
+```ts
+import { create } from "zustand";
+import type { Room } from "../types";
+
+type RoomsState = {
+  rooms: Room[];
+  status: "idle" | "loading" | "error" | "ready";
+  error: string | null;
+};
+
+type RoomsActions = {
+  loadRooms: () => Promise<void>;
+  createRoom: (name: string) => Promise<Room | null>;
+  clear: () => void;
+};
+
+export const useRoomsStore = create<RoomsState & RoomsActions>((set, get) => ({
+  rooms: [],
+  status: "idle",
+  error: null,
+
+  async loadRooms() {
+    set({ status: "loading", error: null });
+    const result = await api.listRooms();
+    if (result.ok) {
+      set({ rooms: result.data, status: "ready" });
+    } else {
+      set({ status: "error", error: result.error.message });
+    }
+  },
+
+  async createRoom(name) {
+    const result = await api.createRoom({ name });
+    if (!result.ok) return null;
+    set((s) => ({ rooms: [...s.rooms, result.data] }));
+    return result.data;
+  },
+
+  clear() {
+    set({ rooms: [], status: "idle", error: null });
+  },
+}));
+```
+
+- Разделять `State` и `Actions` на два типа — повышает читаемость.
+- Имя хука — `useXxxStore`.
+
+## Иммутабельность
+
+- Никогда не мутировать state снаружи. Только через actions внутри slice.
+- Внутри actions — `set({...})` или `set((s) => ({...}))`, без in-place мутаций массивов/объектов.
+- Если объект глубоко вложен и копирование руками неудобно — подключить `immer` middleware (через `03-decisions.md`):
+  ```ts
+  import { immer } from "zustand/middleware/immer";
+  create<...>()(immer((set) => ({ ... })));
+  ```
+  Решение про `immer` принимается на уровне проекта, не на уровне фичи.
+
+## Селекторы
+
+- Компоненты подписываются через узкий селектор, не на весь store:
+  ```ts
+  // Плохо — ре-рендер на любое изменение store
+  const store = useRoomsStore();
+
+  // Хорошо — ре-рендер только при изменении rooms
+  const rooms = useRoomsStore((s) => s.rooms);
+  ```
+- Селекторы, возвращающие объекты/массивы, требуют memoized-равенства (через `shallow`):
+  ```ts
+  import { shallow } from "zustand/shallow";
+  const { rooms, status } = useRoomsStore((s) => ({ rooms: s.rooms, status: s.status }), shallow);
+  ```
+- Селекторы-функции — отдельно от компонентов, если переиспользуются:
+  ```ts
+  export const selectActiveRoom = (s: RoomsState) => s.rooms.find((r) => r.id === s.activeId);
+  ```
+
+## Actions
+
+- Actions — методы внутри `create(...)`. Не выносить наружу как функции.
+- Async actions возвращают `Promise<...>`. Сигнатура должна сообщать вызывающему, можно ли узнать результат:
+  - `Promise<void>` — fire-and-forget с попутным обновлением store.
+  - `Promise<T | null>` — если вызывающему нужен результат для дальнейшей логики (например, navigate после создания).
+- Один action — одна операция. Не запихивать «загрузить и сразу выбрать первый» в одну функцию — пусть вызывающий компонент решает.
+- Внутри action — вся обработка ошибок: маппинг `ApiResult.error` в state, прерывание потока. Компонент не разбирает ошибки повторно.
+
+## Side-effects
+
+- Все side-effects (вызовы api, WS-отправки, navigation) — внутри actions, не в самих компонентах.
+- Исключение: одноразовый `useEffect(() => store.loadRooms(), [])` в page-компоненте для триггера загрузки на mount — нормально.
+- Navigation после успешной операции — через `useNavigate()` в компоненте, не в store (store не знает о роутере).
+
+## Persist
+
+- `persist` middleware — только для данных, которые осмысленно переживают reload:
+  - access/refresh токены (если выбрана стратегия localStorage в `03-decisions.md`)
+  - последняя открытая комната
+  - UI-настройки (тема, размер шрифта)
+- Чувствительные данные (например, JWT) — серьёзно подумать: localStorage уязвим к XSS. Если выбран localStorage, обоснование — в `03-decisions.md`.
+- Версионирование: `persist({ name, version, migrate })` — обязательно при изменении схемы.
+
+## Сброс state
+
+- Каждый store, держащий пользовательские данные, экспортирует `clear()` action.
+- При logout — вызывается `clear()` на всех таких сторах. Центральное место вызова — `useAuthStore.logout()` (она триггерит остальные через `useRoomsStore.getState().clear()` и т.п.).
+- Сбрасываем state до initialState, не `undefined`.
+
+## WS и реактивность
+
+- WS-фреймы приходят в обработчик в `shared/api/ws.ts` или в feature `api/ws.ts` и вызывают action в store:
+  ```ts
+  onFrame: (frame) => {
+    if (frame.type === "message.new") {
+      useChatStore.getState().appendMessage(frame.data);
+    }
+  }
+  ```
+- НЕ вызывать `set(...)` напрямую из WS-обработчика, обходя action — теряется централизация логики.
+- Идемпотентность: при появлении дубликатов `message.new` (например, после reconnect) action должен уметь не вставить второй раз (фильтрация по `id`).
+
+## DevTools
+
+- Подключать `devtools` middleware только в dev-сборке:
+  ```ts
+  const isDev = import.meta.env.DEV;
+  create<...>()(isDev ? devtools(initializer, { name: "rooms" }) : initializer);
+  ```
+- В production — без devtools.
+
+## Тесты
+
+- Сторы тестируются как обычные функции:
+  ```ts
+  beforeEach(() => useRoomsStore.setState(useRoomsStore.getInitialState(), true));
+  ```
+  Очищаем state перед каждым тестом.
+- Мокаем api через `vi.spyOn` или DI (передача api-объекта в store), смотри `Tests Style (Web).txt`.
+
+## Запрещено
+
+- Прямая мутация state снаружи store: `useRoomsStore.getState().rooms.push(...)` — REJECT.
+- Чтение `useStore()` без селектора в компоненте, если store не маленький — REJECT (приведёт к лишним рендерам).
+- Несколько слайсов одной фичи без обоснования — один store на фичу.
+- Persist чувствительных данных без записи в `03-decisions.md` — REJECT.
+- Вызовы router'а (`useNavigate`) из store — REJECT.
+- Глобальное состояние, не в Zustand (React Context для бизнес-данных, синглтоны и т.п.) — REJECT.
+
+## Что обязан проверить агент перед коммитом
+
+1. Каждый store экспортирует `clear()`, если держит user-data.
+2. Все компоненты подписываются через узкие селекторы.
+3. Side-effects — только внутри actions.
+4. Обработка ошибок — в action, не в компоненте.
+5. WS-обработчики вызывают actions, не `set` напрямую.
+6. Persist (если есть) задокументирован в `03-decisions.md` и имеет миграцию.
+7. Тесты store сбрасывают state в beforeEach.

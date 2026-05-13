@@ -1,0 +1,233 @@
+# Tests Style (Web) — как писать тесты во фронтенде Rupor
+
+Тестовый стек: **vitest** + **React Testing Library** (для component) + **Playwright** (для e2e). Все правила обязательны для агентов Claude.
+
+## Уровни тестов
+
+| Уровень | Инструмент | Что покрывает |
+|---------|------------|---------------|
+| Unit | vitest | Pure-функции, маппинги DTO ↔ ViewModel, утилиты shared/lib |
+| Store | vitest | Zustand-сторы: actions, селекторы, обработка ошибок |
+| Hooks | vitest + RTL `renderHook` | Кастомные хуки |
+| Component | RTL | React-компоненты: рендер всех состояний, интеракции, a11y |
+| E2E | Playwright | Cценарии в браузере поверх реального бэка |
+
+## Файлы и расположение
+
+- Unit / Store / Hooks / Component тесты — рядом с тестируемым кодом:
+  ```
+  features/auth/store/index.ts
+  features/auth/store/index.test.ts
+  features/auth/components/LoginForm.tsx
+  features/auth/components/LoginForm.test.tsx
+  ```
+- E2E тесты — в `web/e2e/`, по фичам: `web/e2e/auth.spec.ts`, `web/e2e/chat.spec.ts`.
+- Конфиги: `web/vitest.config.ts`, `web/playwright.config.ts`.
+
+## Vitest: базовая структура
+
+```ts
+import { describe, it, expect, beforeEach, vi } from "vitest";
+
+describe("useAuthStore", () => {
+  beforeEach(() => {
+    useAuthStore.setState(useAuthStore.getInitialState(), true);
+    vi.restoreAllMocks();
+  });
+
+  it("сохраняет токены после успешного логина", async () => {
+    vi.spyOn(authApi, "login").mockResolvedValue({
+      ok: true,
+      data: { accessToken: "a", refreshToken: "r", accessExpiresAt: "...", refreshExpiresAt: "..." },
+    });
+
+    await useAuthStore.getState().login("u@example.com", "pwd");
+
+    expect(useAuthStore.getState().status).toBe("authenticated");
+    expect(tokenStorage.getAccess()).toBe("a");
+  });
+
+  it("ставит status=error при 401 AUTH-006", async () => {
+    vi.spyOn(authApi, "login").mockResolvedValue({
+      ok: false, status: 401,
+      error: { code: "AUTH-006", message: "invalid credentials" },
+    });
+
+    await useAuthStore.getState().login("u@example.com", "wrong");
+
+    expect(useAuthStore.getState().status).toBe("error");
+  });
+});
+```
+
+## AAA (Arrange / Act / Assert)
+
+- Каждый тест — три явные секции (пустыми строками или комментариями).
+- Один тест — одна проверка. Не сваливать несколько утверждений в один `it`.
+- Имя теста — `it("делает X при Y")` или `it("returns X when Y")` — на русском или английском, согласованно в файле.
+
+## Component tests (RTL)
+
+```ts
+import { render, screen, fireEvent } from "@testing-library/react";
+import { describe, it, expect, vi } from "vitest";
+import { LoginForm } from "./LoginForm";
+
+describe("<LoginForm />", () => {
+  it("рендерит поля email и password", () => {
+    render(<LoginForm onSubmit={vi.fn()} isSubmitting={false} />);
+    expect(screen.getByLabelText(/email/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/пароль/i)).toBeInTheDocument();
+  });
+
+  it("вызывает onSubmit с введёнными значениями", async () => {
+    const onSubmit = vi.fn();
+    render(<LoginForm onSubmit={onSubmit} isSubmitting={false} />);
+
+    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: "u@e.com" } });
+    fireEvent.change(screen.getByLabelText(/пароль/i), { target: { value: "secret123" } });
+    fireEvent.click(screen.getByRole("button", { name: /войти/i }));
+
+    expect(onSubmit).toHaveBeenCalledWith({ email: "u@e.com", password: "secret123" });
+  });
+
+  it("показывает спиннер при isSubmitting=true", () => {
+    render(<LoginForm onSubmit={vi.fn()} isSubmitting={true} />);
+    expect(screen.getByRole("progressbar")).toBeInTheDocument();
+  });
+});
+```
+
+### Обязательные тесты компонента
+
+Для каждого React-компонента, который зависит от состояния, нужны тесты:
+
+| Тест | Что проверяет |
+|------|---------------|
+| renders idle | стартовый UI |
+| renders loading | спиннер / скелетон |
+| renders empty | placeholder при пустых данных |
+| renders error | сообщение ошибки + retry |
+| renders success | основной UI с данными |
+| handles user input | onChange, onClick, onSubmit |
+| keyboard navigation | Enter сабмитит, Esc закрывает (для модалок) |
+| accessible names | getByRole + name, getByLabelText, без падений |
+
+### Selectors (RTL)
+
+Приоритет селекторов (от лучшего к худшему):
+
+1. `getByRole("button", { name: /войти/i })` — самый стабильный, имитирует пользователя.
+2. `getByLabelText("Email")` — для форм.
+3. `getByPlaceholderText("...")` — если нет label (но лучше label).
+4. `getByText(/.../)` — для статического текста.
+5. `getByTestId("...")` — только когда другие не подходят. `data-testid` минимизировать.
+
+Никогда: `container.querySelector(".my-class")` — REJECT. CSS-классы — деталь реализации.
+
+## Hooks tests
+
+```ts
+import { renderHook, act } from "@testing-library/react";
+
+it("useToggle переключает значение", () => {
+  const { result } = renderHook(() => useToggle(false));
+  expect(result.current.value).toBe(false);
+  act(() => result.current.toggle());
+  expect(result.current.value).toBe(true);
+});
+```
+
+## Моки
+
+### Моки api-функций
+
+```ts
+import * as authApi from "@/features/auth/api/http";
+
+vi.spyOn(authApi, "login").mockResolvedValue({ ok: true, data: {...} });
+```
+
+### Моки fetch (для тестов `shared/api/fetch.ts`)
+
+- Использовать `vi.stubGlobal("fetch", vi.fn())` или MSW (если выбран в `03-decisions.md`).
+- MSW предпочтительнее для тестов, где важна работа с реальным URL и headers.
+
+### Моки WebSocket
+
+- `shared/api/ws.ts` экспортирует фабрику; в тестах подменяется фабрика с in-memory implementation.
+- Альтернатива: `vi.stubGlobal("WebSocket", class FakeWS { ... })`.
+
+### Моки роутера
+
+```ts
+import { MemoryRouter } from "react-router-dom";
+
+render(
+  <MemoryRouter initialEntries={["/rooms"]}>
+    <RoomsPage />
+  </MemoryRouter>
+);
+```
+
+## Coverage Mapping
+
+Каждый код ошибки бэка, который UI визуализирует, должен иметь тест. В `04-testing.md` фичи — таблица:
+
+| Use Case | Backend Error Code | Test Type | Test Name |
+|----------|-------------------|-----------|-----------|
+| Login    | `AUTH-006`        | store     | `useAuthStore — ставит status=error при AUTH-006` |
+| Login    | `AUTH-011`        | unit (refresh) | `single-flight refresh не делает второй запрос` |
+| Register | `AUTH-004`        | component | `<RegisterForm /> подсвечивает поле email` |
+
+## E2E (Playwright)
+
+```ts
+import { test, expect } from "@playwright/test";
+
+test("happy path: register → create room → send message", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("link", { name: /регистрация/i }).click();
+  await page.getByLabel("Email").fill(`user-${Date.now()}@e2e.test`);
+  await page.getByLabel("Username").fill(`u${Date.now()}`);
+  await page.getByLabel("Пароль").fill("super-secret-123");
+  await page.getByRole("button", { name: /создать аккаунт/i }).click();
+
+  await expect(page).toHaveURL("/rooms");
+  // ... дальше создание комнаты, отправка сообщения
+});
+```
+
+### Правила e2e
+
+- Запускать против реального бэка (`make run` + `make dc-up` + `make migrate-up`).
+- Каждый тест — изолированный пользователь (уникальный email / username с timestamp).
+- Никаких `page.waitForTimeout()` для синхронизации — только `waitForResponse`, `expect(...).toBeVisible()`.
+- Selectors — те же, что в RTL: `getByRole`, `getByLabel`. CSS-селекторы — только в крайнем случае.
+- Один сценарий — одна user-story. Не сваливать «и регистрация, и логин, и комнаты» в один тест.
+
+## Что НЕ тестируем
+
+- Сторонние библиотеки (роутер, Zustand-внутренности) — не наша зона.
+- Стилевые детали (отступы, цвета) — это работа дизайнера / визуальных regression-тестов (если они будут).
+- Тривиальные геттеры / прокси-функции из одной строки.
+
+## Запрещено
+
+- `setTimeout` / `waitForTimeout` для синхронизации — REJECT, использовать `waitFor` / `findBy*`.
+- Тесты, зависящие от порядка выполнения (`it.only` забыт в commit'е) — REJECT.
+- Моки, возвращающие `as any` или нетипизированные значения — REJECT.
+- `expect(...).toBeTruthy()` вместо точного матчера — REJECT (теряем сигнал).
+- Тесты без cleanup (`afterEach` / `beforeEach` со сбросом state) — REJECT для тестов сторов.
+- E2E против моков бэка — REJECT, e2e ходят к настоящему серверу.
+- Снапшот-тесты на компоненты — REJECT (хрупкие, не несут информации).
+
+## Что обязан проверить агент перед коммитом
+
+1. `npm --prefix web run test -- --run` — все unit/store/component тесты зелёные.
+2. `npm --prefix web run e2e` — все e2e сценарии проходят (если бэк поднят).
+3. Каждый новый компонент имеет тесты на все применимые состояния (idle/loading/empty/error/success).
+4. Каждый новый store-action имеет тест на happy path + хотя бы один error path.
+5. Coverage mapping ошибок обновлён в `04-testing.md`.
+6. Никаких `it.only` / `describe.only` в коммитах.
+7. Селекторы — role/label, не CSS-классы.
